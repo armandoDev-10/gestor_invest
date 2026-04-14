@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Investigador PRO | Matriz con filtros + Tarjetas + Categorías</title>
+    <title>Investigador PRO</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Google Identity Services (para Drive) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, 'Segoe UI', 'Inter', sans-serif; }
         body { background: #f0f4f8; padding: 2rem 1.5rem; }
@@ -61,7 +63,6 @@
         textarea { width: 100%; padding: 0.8rem; border: 1px solid #cbdde6; border-radius: 1rem; font-family: monospace; font-size: 0.85rem; }
         .vista-previa { background: #fefaf5; border: 1px solid #cbdde6; border-radius: 1rem; padding: 1rem; overflow-y: auto; max-height: 550px; }
         .categoria-input { width: 100%; border-radius: 1rem; padding: 0.3rem; border: 1px solid #cbdde6; }
-        /* Estilos para vista de tarjetas */
         .tarjetas-container { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
         .tarjeta-nota { background: white; border-radius: 1.2rem; border: 1px solid #e2dcd5; padding: 1rem; width: calc(33% - 1rem); min-width: 280px; flex: 1 1 auto; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.1s; }
         .tarjeta-nota:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
@@ -78,7 +79,7 @@
 <div class="container">
     <div class="header-busqueda">
         <div class="busqueda-input">
-            <label>🔍 Buscar (SQL LIKE)</label>
+            <label>🔍 Buscar</label>
             <input type="text" id="buscarInput" placeholder="Palabra o frase...">
         </div>
         <button id="btnBuscar">Buscar</button>
@@ -98,6 +99,7 @@
                     <button id="btnExportarDB" class="btn-sec">📤 Exportar DB (.db)</button>
                     <button id="btnImportarReemplazar" class="btn-sec">📥 Importar DB (reemplazar)</button>
                     <button id="btnImportarCombinar" class="btn-sec">➕ Añadir DB (combinar)</button>
+                    <button id="btnGuardarDrive" class="btn-sec">☁️ Guardar en Google Drive</button>
                     <button id="btnGenerarPDFGlobal" class="btn-sec">📄 PDF Global</button>
                     <button id="btnMarkdownGlobal" class="btn-sec">📝 Reporte Global MD</button>
                     <input type="file" id="importDBReemplazar" accept=".db" style="display:none;">
@@ -114,7 +116,7 @@
     </div>
 </div>
 
-<!-- Modales (incluyendo categorías predefinidas) -->
+<!-- Modales -->
 <div id="modalResultados" class="modal"><div class="modal-contenido"><h3>🔍 Resultados de búsqueda</h3><div id="resultadosLista"></div><div class="botones-modal"><button id="btnCerrarResultados" class="btn-sec">Cerrar</button></div></div></div>
 <div id="modalFuente" class="modal"><div class="modal-contenido"><h3 id="modalFuenteTitulo">➕ Fuente</h3><div class="campo"><label>Título</label><input type="text" id="fuenteTitulo"></div><div class="campo"><label>URL / DOI</label><input type="url" id="fuenteUrl"></div><div class="campo"><label>Fecha consulta (año)</label><input type="text" id="fuenteFecha" placeholder="Ej: 2023"></div><div class="campo"><label>Tipo</label><input type="text" id="fuenteTipo" placeholder="Artículo, libro..."></div><div class="campo"><label>Autores</label><input type="text" id="fuenteAutores" placeholder="Apellido, N.; Apellido2, N."></div><div class="botones-modal"><button id="btnGuardarFuente">Guardar</button><button id="btnCancelarFuente" class="btn-sec">Cancelar</button></div></div></div>
 <div id="modalNota" class="modal"><div class="modal-contenido"><h3 id="modalNotaTitulo">📝 Nota de lectura</h3><div class="campo"><label>📍 Ubicación</label><input type="text" id="notaUbicacion"></div><div class="campo"><label>📄 Nota</label><textarea id="notaTexto" rows="4"></textarea></div><div class="campo"><label>📅 Fecha</label><input type="date" id="notaFecha"></div>
@@ -136,8 +138,6 @@
 </div></div>
 <div id="modalMatriz" class="modal"><div class="modal-contenido"><h3 id="matrizTitulo">📊 Matriz de datos</h3><div id="matrizContenido"></div><div class="botones-modal"><button id="btnExportarMatrizCSV" class="btn-sec">📎 Exportar a CSV</button><button id="btnCerrarMatriz" class="btn-sec">Cerrar</button></div></div></div>
 <div id="modalCita" class="modal"><div class="modal-contenido"><h3>📝 Cita APA (7ª edición)</h3><div id="citaTexto" class="cita-texto"></div><div class="botones-modal"><button id="btnCopiarCita" class="btn-copiar">📋 Copiar cita</button><button id="btnCerrarCita" class="btn-sec">Cerrar</button></div></div></div>
-
-<!-- Modal editor Markdown -->
 <div id="modalMarkdown" class="modal">
     <div class="modal-contenido" style="max-width: 1400px;">
         <h3>✏️ Editor Markdown</h3>
@@ -175,6 +175,71 @@
     let currentMarkdownContent = '';
     let currentMarkdownFilename = 'reporte.md';
     let vistaActual = 'tabla'; // 'tabla' o 'tarjetas'
+
+    // ---------- Google Drive ----------
+    const CLIENT_ID = '197758625418-vc2r4kgtg7oa7ll5cni3hbhfmthonvef.apps.googleusercontent.com';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+    let tokenClient = null;
+    let accessToken = null;
+
+    function initGoogleDrive() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: (tokenResponse) => {
+                if (tokenResponse.access_token) {
+                    accessToken = tokenResponse.access_token;
+                    uploadCurrentDB(); // subir después de autenticar
+                } else {
+                    alert('No se pudo obtener acceso a Google Drive.');
+                }
+            },
+        });
+    }
+
+    function saveToDrive() {
+        if (!accessToken) {
+            // Solicitar autenticación
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+        } else {
+            uploadCurrentDB();
+        }
+    }
+
+    async function uploadCurrentDB() {
+        if (!accessToken) {
+            alert('No estás autenticado. Intenta de nuevo.');
+            return;
+        }
+        const dbData = db.export();
+        const blob = new Blob([dbData], { type: 'application/octet-stream' });
+        const fileName = `investigacion_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.db`;
+        const metadata = {
+            name: fileName,
+            mimeType: 'application/octet-stream'
+        };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', blob);
+
+        try {
+            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${accessToken}` },
+                body: form
+            });
+            const result = await response.json();
+            if (response.ok) {
+                alert(`✅ Archivo guardado en Google Drive: ${fileName}`);
+            } else {
+                console.error(result);
+                alert('Error al guardar en Drive: ' + (result.error?.message || 'Desconocido'));
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error de red o permisos.');
+        }
+    }
 
     // ---------- INICIALIZAR SQLITE ----------
     async function initDatabase() {
@@ -218,7 +283,7 @@
     function mostrarCitaAPA(fuenteId) { const fuente = obtenerFuente(fuenteId); if (!fuente) return; const cita = generarCitaAPA(fuente); document.getElementById('citaTexto').innerHTML = escapeHtml(cita); document.getElementById('modalCita').style.display = 'flex'; window.citaPlana = cita; }
     function copiarCita() { if(window.citaPlana) { navigator.clipboard.writeText(window.citaPlana); alert('Cita copiada'); } }
 
-    // ---------- MATRIZ DE HALLAZGOS CON FILTROS Y VISTA TARJETAS ----------
+    // ---------- MATRIZ DE HALLAZGOS ----------
     function mostrarMatrizHallazgos(temaId) {
         const tema = listarTemas().find(t => t.id === temaId);
         if (!tema) return;
@@ -239,7 +304,6 @@
                 });
             }
         }
-        // Construir modal con filtro y selector de vista
         const modalDiv = document.createElement('div');
         modalDiv.id = 'modalMatrizHallazgos';
         modalDiv.className = 'modal';
@@ -297,12 +361,11 @@
                             <td>${escapeHtml(n.texto)}</td>
                             <td><input type="text" class="categoria-input" data-id="${n.id}" value="${escapeHtml(n.categoria)}" list="categoriasList" style="width:100%;"><datalist id="categoriasList">${Array.from(new Set(todasNotas.map(nn => nn.categoria))).filter(c=>c).map(c=>`<option>${c}</option>`).join('')}</datalist></td>
                             <td><button class="guardar-categoria" data-id="${n.id}">💾 Guardar</button></td>
-                         </tr>`;
+                          </tr>`;
             }
             if (notas.length === 0) html += '<tr><td colspan="6">No hay notas con este filtro.</td></tr>';
             html += `</tbody></table>`;
             contenedor.innerHTML = html;
-            // Eventos guardar categoría
             document.querySelectorAll('.guardar-categoria').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const notaId = btn.getAttribute('data-id');
@@ -310,7 +373,6 @@
                     const nuevaCategoria = input.value.trim();
                     db.run("UPDATE notas SET categoria = ? WHERE id = ?", [nuevaCategoria, notaId]);
                     alert('Categoría guardada');
-                    // Recargar matriz para actualizar opciones de filtro
                     mostrarMatrizHallazgos(temaId);
                 });
             });
@@ -336,7 +398,6 @@
             if (notas.length === 0) html += '<p>No hay notas con este filtro.</p>';
             html += `</div>`;
             contenedor.innerHTML = html;
-            // Eventos para guardar categoría desde tarjeta
             document.querySelectorAll('.guardar-categoria-tarjeta').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const notaId = btn.getAttribute('data-id');
@@ -383,7 +444,7 @@
         URL.revokeObjectURL(a.href);
     }
 
-    // ---------- RENDERIZADO PRINCIPAL (similar al anterior, pero con matriz mejorada) ----------
+    // ---------- RENDERIZADO PRINCIPAL ----------
     function renderizarTemas() {
         const container = document.getElementById('temasLista');
         const temas = listarTemas();
@@ -630,8 +691,114 @@
 
     // ---------- IMPORTACIÓN/EXPORTACIÓN DB ----------
     function exportarDB() { const data = db.export(); const blob = new Blob([data], {type: 'application/octet-stream'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `investigacion_${new Date().toISOString().slice(0,19)}.db`; a.click(); URL.revokeObjectURL(url); }
-    function importarDBReemplazar(file) { if (!SQL) { alert("La librería SQL no está lista."); return; } if (!confirm('⚠️ Esta acción reemplazará TODOS los datos actuales por los del archivo. ¿Continuar?')) return; const reader = new FileReader(); reader.onload = e => { try { const array = new Uint8Array(e.target.result); if (db) db.close(); db = new SQL.Database(array); dbInitialized = true; temaActivoId = null; renderizarTodo(); alert('Base de datos reemplazada correctamente.'); } catch (err) { alert('Error al importar: ' + err.message); } }; reader.readAsArrayBuffer(file); }
-    function importarDBCombinar(file) { if (!SQL) { alert("La librería SQL no está lista."); return; } const reader = new FileReader(); reader.onload = e => { try { const array = new Uint8Array(e.target.result); const newDb = new SQL.Database(array); const tablas = ['temas', 'fuentes', 'notas']; for (let tabla of tablas) { const stmt = newDb.prepare(`SELECT * FROM ${tabla}`); const columnNames = stmt.getColumnNames(); const insertStmt = db.prepare(`INSERT OR IGNORE INTO ${tabla} (${columnNames.join(',')}) VALUES (${columnNames.map(() => '?').join(',')})`); while (stmt.step()) { const row = stmt.get(); insertStmt.run(row); } insertStmt.free(); stmt.free(); } newDb.close(); renderizarTodo(); alert('Datos combinados correctamente (se añadieron nuevos registros sin duplicados).'); } catch (err) { alert('Error al combinar: ' + err.message); } }; reader.readAsArrayBuffer(file); }
+
+    function importarDBReemplazar(file) {
+        if (!SQL) { alert("La librería SQL no está lista."); return; }
+        if (!confirm('⚠️ Esta acción reemplazará TODOS los datos actuales por los del archivo. ¿Continuar?')) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const array = new Uint8Array(e.target.result);
+                if (db) db.close();
+                db = new SQL.Database(array);
+                dbInitialized = true;
+                temaActivoId = null;
+                renderizarTodo();
+                alert('Base de datos reemplazada correctamente.');
+            } catch (err) { alert('Error al importar: ' + err.message); }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // NUEVA FUNCIÓN: COMBINAR CON FUSIÓN DE TEMAS POR NOMBRE
+    function importarDBCombinar(file) {
+        if (!SQL) { alert("La librería SQL no está lista."); return; }
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const array = new Uint8Array(e.target.result);
+                const newDb = new SQL.Database(array);
+                
+                // 1. Obtener temas actuales y sus nombres (para comparación)
+                const temasExistentes = listarTemas(); // array de {id, nombre}
+                const mapaNombreAId = new Map();
+                temasExistentes.forEach(t => mapaNombreAId.set(t.nombre.toLowerCase(), t.id));
+                
+                // 2. Leer temas de la DB importada
+                const temasImportados = [];
+                const stmtTemas = newDb.prepare("SELECT id, nombre FROM temas");
+                while (stmtTemas.step()) temasImportados.push(stmtTemas.getAsObject());
+                stmtTemas.free();
+                
+                // Mapa de ID_original -> ID_destino para temas
+                const temaIdMap = new Map();
+                for (let t of temasImportados) {
+                    const nombreLower = t.nombre.toLowerCase();
+                    if (mapaNombreAId.has(nombreLower)) {
+                        // Tema duplicado: usar el existente
+                        temaIdMap.set(t.id, mapaNombreAId.get(nombreLower));
+                    } else {
+                        // Tema nuevo: insertar (generar nuevo ID para evitar conflictos)
+                        const newId = generarId();
+                        db.run("INSERT INTO temas (id, nombre) VALUES (?, ?)", [newId, t.nombre]);
+                        temaIdMap.set(t.id, newId);
+                        mapaNombreAId.set(nombreLower, newId); // para futuros mapeos
+                    }
+                }
+                
+                // 3. Procesar fuentes de la DB importada
+                const fuentesImportadas = [];
+                const stmtFuentes = newDb.prepare("SELECT * FROM fuentes");
+                const columnasFuentes = stmtFuentes.getColumnNames();
+                while (stmtFuentes.step()) fuentesImportadas.push(stmtFuentes.getAsObject());
+                stmtFuentes.free();
+                
+                const fuenteIdMap = new Map(); // ID_original -> ID_destino (puede cambiar si hay conflicto)
+                for (let f of fuentesImportadas) {
+                    const nuevoTemaId = temaIdMap.get(f.tema_id);
+                    if (!nuevoTemaId) continue; // no debería pasar
+                    
+                    // Verificar si ya existe una fuente con el mismo ID en la DB actual
+                    const existe = db.exec("SELECT id FROM fuentes WHERE id = ?", [f.id]);
+                    let nuevoId = f.id;
+                    let conflicto = (existe.length > 0 && existe[0].values && existe[0].values.length > 0);
+                    if (conflicto) {
+                        nuevoId = generarId(); // ID nuevo para evitar colisión
+                    }
+                    // Insertar la fuente (sin duplicados por ID, pero permitiendo duplicados de título)
+                    db.run(`INSERT INTO fuentes (id, tema_id, titulo, url, fecha_consulta, tipo, autores) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                        [nuevoId, nuevoTemaId, f.titulo, f.url, f.fecha_consulta, f.tipo, f.autores]);
+                    fuenteIdMap.set(f.id, nuevoId);
+                }
+                
+                // 4. Procesar notas
+                const notasImportadas = [];
+                const stmtNotas = newDb.prepare("SELECT * FROM notas");
+                while (stmtNotas.step()) notasImportadas.push(stmtNotas.getAsObject());
+                stmtNotas.free();
+                
+                for (let n of notasImportadas) {
+                    const nuevaFuenteId = fuenteIdMap.get(n.fuente_id);
+                    if (!nuevaFuenteId) continue;
+                    // Evitar conflicto de ID de nota
+                    const existeNota = db.exec("SELECT id FROM notas WHERE id = ?", [n.id]);
+                    let nuevoIdNota = n.id;
+                    if (existeNota.length > 0 && existeNota[0].values && existeNota[0].values.length > 0) {
+                        nuevoIdNota = generarId();
+                    }
+                    db.run(`INSERT INTO notas (id, fuente_id, ubicacion, texto, fecha, categoria) VALUES (?, ?, ?, ?, ?, ?)`,
+                        [nuevoIdNota, nuevaFuenteId, n.ubicacion, n.texto, n.fecha, n.categoria]);
+                }
+                
+                newDb.close();
+                renderizarTodo();
+                alert('Datos combinados correctamente. Los temas duplicados se han fusionado por nombre.');
+            } catch (err) {
+                alert('Error al combinar: ' + err.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
 
     // ---------- PDF ----------
     async function generarPDFTema(temaId) {
@@ -782,11 +949,15 @@
         }
         renderizarTodo();
 
+        // Inicializar Google Drive
+        initGoogleDrive();
+
         // Eventos UI
         document.getElementById('btnCrearTema').addEventListener('click', () => { const nombre = document.getElementById('nuevoTemaNombre').value; if(crearTema(nombre)) { document.getElementById('nuevoTemaNombre').value = ''; renderizarTodo(); } });
         document.getElementById('btnExportarDB').addEventListener('click', exportarDB);
         document.getElementById('btnImportarReemplazar').addEventListener('click', () => document.getElementById('importDBReemplazar').click());
         document.getElementById('btnImportarCombinar').addEventListener('click', () => document.getElementById('importDBCombinar').click());
+        document.getElementById('btnGuardarDrive').addEventListener('click', () => saveToDrive());
         document.getElementById('importDBReemplazar').addEventListener('change', e => { if(e.target.files.length) importarDBReemplazar(e.target.files[0]); e.target.value = ''; });
         document.getElementById('importDBCombinar').addEventListener('change', e => { if(e.target.files.length) importarDBCombinar(e.target.files[0]); e.target.value = ''; });
         document.getElementById('btnGenerarPDFGlobal').addEventListener('click', generarPDFGlobal);

@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Investigador PRO | Matriz con filtros + Tarjetas + Categorías</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, 'Segoe UI', 'Inter', sans-serif; }
+        body { background: #f0f4f8; padding: 2rem 1.5rem; }
+        .container { max-width: 1600px; margin: 0 auto; }
+        .header-busqueda { display: flex; gap: 1rem; align-items: flex-end; background: white; border-radius: 2rem; padding: 1rem 1.5rem; margin-bottom: 2rem; flex-wrap: wrap; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .busqueda-input { flex: 3; min-width: 200px; }
+        .busqueda-input label { font-weight: 600; font-size: 0.8rem; color: #1e4a62; }
+        .busqueda-input input { width: 100%; padding: 0.7rem 1rem; border: 1px solid #cbdde6; border-radius: 2rem; }
+        button { background: #2c7da0; border: none; color: white; font-weight: 600; padding: 0.6rem 1.4rem; border-radius: 2rem; cursor: pointer; font-size: 0.85rem; transition: 0.2s; }
+        button:hover { background: #1f5e7c; transform: translateY(-2px); }
+        .btn-sec { background: #5f7f8c; }
+        .btn-accion { background: #dc6b4a; padding: 4px 10px; font-size: 0.7rem; margin: 0 4px; border-radius: 30px; }
+        .btn-editar { background: #4a7c59; }
+        .two-columns { display: flex; gap: 2rem; flex-wrap: wrap; }
+        .col-temas { flex: 1.2; min-width: 280px; }
+        .col-detalle { flex: 2; min-width: 320px; }
+        .card { background: white; border-radius: 2rem; box-shadow: 0 12px 28px rgba(0,0,0,0.08); padding: 1.5rem; margin-bottom: 2rem; }
+        h1 { font-size: 1.8rem; background: linear-gradient(135deg, #1a4b6e, #2c7a4d); background-clip: text; -webkit-background-clip: text; color: transparent; margin-bottom: 0.5rem; }
+        h2 { font-size: 1.4rem; color: #1f3b4c; margin-bottom: 1rem; border-left: 4px solid #3a8bb9; padding-left: 1rem; }
+        .form-group { display: flex; flex-wrap: wrap; gap: 1rem; background: #f8fafc; padding: 1rem 1.5rem; border-radius: 1.5rem; margin-bottom: 1.5rem; align-items: flex-end; }
+        .campo { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
+        .campo label { font-weight: 600; font-size: 0.8rem; color: #1e4a62; }
+        .campo input, .campo textarea, .campo select { background: white; border: 1px solid #cbdde6; border-radius: 1rem; padding: 0.6rem 1rem; font-size: 0.9rem; }
+        .toolbar { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; margin-bottom: 1.2rem; }
+        .temas-lista { max-height: 70vh; overflow-y: auto; padding-right: 5px; }
+        .tema-item { background: #fefaf5; border-radius: 1.2rem; padding: 0.8rem 1rem; margin-bottom: 0.8rem; cursor: pointer; border: 1px solid #e2dcd5; display: flex; justify-content: space-between; align-items: center; }
+        .tema-item:hover { background: #fff3e6; transform: translateX(3px); }
+        .tema-activo { background: #e6f0f5; border-left: 5px solid #2c7da0; font-weight: 600; }
+        .tema-nombre { font-weight: 600; color: #2c3e44; }
+        .tema-fechas { font-size: 0.7rem; color: #7f8c8d; }
+        .notas-lista { margin-top: 0.5rem; padding-left: 1rem; border-left: 2px solid #cbdde6; }
+        .nota-item { background: #f9f9f9; border-radius: 1rem; padding: 0.6rem; margin-bottom: 0.5rem; font-size: 0.8rem; }
+        .nota-ref { font-weight: 600; color: #2c7da0; font-size: 0.7rem; }
+        .badge { background: #e2eaf1; padding: 0.2rem 0.6rem; border-radius: 30px; font-size: 0.7rem; }
+        .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(3px); align-items:center; justify-content:center; z-index:1000; }
+        .modal-contenido { background: white; padding: 2rem; border-radius: 2rem; width: 90%; max-width: 1400px; max-height: 85vh; overflow-y: auto; animation: fadeUp 0.2s; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .botones-modal { display: flex; justify-content: flex-end; gap: 12px; margin-top: 1.5rem; }
+        .resultado-item { padding: 0.8rem; border-bottom: 1px solid #e2e8f0; cursor: pointer; }
+        .resultado-item:hover { background: #f0f9ff; }
+        .matriz-tabla { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        .matriz-tabla th, .matriz-tabla td { border: 1px solid #cbdde6; padding: 8px; text-align: left; vertical-align: top; }
+        .matriz-tabla th { background: #eef3f7; }
+        .cita-texto { background: #f8fafc; padding: 1rem; border-radius: 1rem; font-family: monospace; white-space: pre-wrap; word-break: break-word; margin: 1rem 0; }
+        .btn-copiar { background: #4a7c59; margin-left: 1rem; }
+        .editor-markdown-container { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
+        .editor-markdown-container > div { flex: 1; min-width: 280px; }
+        .markdown-toolbar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; background: #eef3f7; padding: 6px; border-radius: 1rem; }
+        .markdown-toolbar button { background: white; color: #2c7da0; padding: 4px 8px; font-size: 0.8rem; box-shadow: none; margin: 0; }
+        .markdown-toolbar button:hover { background: #dce9f0; transform: none; }
+        textarea { width: 100%; padding: 0.8rem; border: 1px solid #cbdde6; border-radius: 1rem; font-family: monospace; font-size: 0.85rem; }
+        .vista-previa { background: #fefaf5; border: 1px solid #cbdde6; border-radius: 1rem; padding: 1rem; overflow-y: auto; max-height: 550px; }
+        .categoria-input { width: 100%; border-radius: 1rem; padding: 0.3rem; border: 1px solid #cbdde6; }
+        /* Estilos para vista de tarjetas */
+        .tarjetas-container { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+        .tarjeta-nota { background: white; border-radius: 1.2rem; border: 1px solid #e2dcd5; padding: 1rem; width: calc(33% - 1rem); min-width: 280px; flex: 1 1 auto; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.1s; }
+        .tarjeta-nota:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .tarjeta-fuente { font-weight: bold; color: #2c7da0; }
+        .tarjeta-autores { font-size: 0.8rem; color: #5f7f8c; }
+        .tarjeta-ubicacion { font-size: 0.75rem; color: #9b6a3c; margin-top: 0.3rem; }
+        .tarjeta-texto { margin: 0.5rem 0; font-size: 0.9rem; }
+        .tarjeta-categoria { margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .vista-toggle { margin-left: 1rem; }
+        @media (max-width: 800px) { .two-columns { flex-direction: column; } body { padding: 1rem; } .tarjeta-nota { width: 100%; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header-busqueda">
+        <div class="busqueda-input">
+            <label>🔍 Buscar (SQL LIKE)</label>
+            <input type="text" id="buscarInput" placeholder="Palabra o frase...">
+        </div>
+        <button id="btnBuscar">Buscar</button>
+        <button id="btnLimpiarBusqueda" class="btn-sec">Limpiar</button>
+    </div>
+
+    <div class="two-columns">
+        <div class="col-temas">
+            <div class="card">
+                <h2>📌 Temas de investigación</h2>
+                <div class="form-group">
+                    <div class="campo" style="flex:2;"><label>Nuevo tema</label><input type="text" id="nuevoTemaNombre" placeholder="Ej: Inteligencia Artificial"></div>
+                    <button id="btnCrearTema">➕ Crear</button>
+                </div>
+                <div id="temasLista" class="temas-lista"></div>
+                <div class="toolbar" style="margin-top: 1rem;">
+                    <button id="btnExportarDB" class="btn-sec">📤 Exportar DB (.db)</button>
+                    <button id="btnImportarReemplazar" class="btn-sec">📥 Importar DB (reemplazar)</button>
+                    <button id="btnImportarCombinar" class="btn-sec">➕ Añadir DB (combinar)</button>
+                    <button id="btnGenerarPDFGlobal" class="btn-sec">📄 PDF Global</button>
+                    <button id="btnMarkdownGlobal" class="btn-sec">📝 Reporte Global MD</button>
+                    <input type="file" id="importDBReemplazar" accept=".db" style="display:none;">
+                    <input type="file" id="importDBCombinar" accept=".db" style="display:none;">
+                </div>
+            </div>
+        </div>
+        <div class="col-detalle">
+            <div class="card">
+                <div id="detalleHeader"><h2 id="temaSeleccionadoTitulo">📖 Ningún tema seleccionado</h2></div>
+                <div id="contenidoDetalle"><p style="color:#7f8c8d; text-align:center;">Selecciona un tema de la izquierda.</p></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modales (incluyendo categorías predefinidas) -->
+<div id="modalResultados" class="modal"><div class="modal-contenido"><h3>🔍 Resultados de búsqueda</h3><div id="resultadosLista"></div><div class="botones-modal"><button id="btnCerrarResultados" class="btn-sec">Cerrar</button></div></div></div>
+<div id="modalFuente" class="modal"><div class="modal-contenido"><h3 id="modalFuenteTitulo">➕ Fuente</h3><div class="campo"><label>Título</label><input type="text" id="fuenteTitulo"></div><div class="campo"><label>URL / DOI</label><input type="url" id="fuenteUrl"></div><div class="campo"><label>Fecha consulta (año)</label><input type="text" id="fuenteFecha" placeholder="Ej: 2023"></div><div class="campo"><label>Tipo</label><input type="text" id="fuenteTipo" placeholder="Artículo, libro..."></div><div class="campo"><label>Autores</label><input type="text" id="fuenteAutores" placeholder="Apellido, N.; Apellido2, N."></div><div class="botones-modal"><button id="btnGuardarFuente">Guardar</button><button id="btnCancelarFuente" class="btn-sec">Cancelar</button></div></div></div>
+<div id="modalNota" class="modal"><div class="modal-contenido"><h3 id="modalNotaTitulo">📝 Nota de lectura</h3><div class="campo"><label>📍 Ubicación</label><input type="text" id="notaUbicacion"></div><div class="campo"><label>📄 Nota</label><textarea id="notaTexto" rows="4"></textarea></div><div class="campo"><label>📅 Fecha</label><input type="date" id="notaFecha"></div>
+    <div class="campo"><label>🏷️ Categoría</label>
+        <input list="categoriasPredefinidas" id="notaCategoria" placeholder="Selecciona o escribe una categoría">
+        <datalist id="categoriasPredefinidas">
+            <option>Hallazgo</option>
+            <option>Debilidad</option>
+            <option>Propuesta</option>
+            <option>Oportunidad</option>
+            <option>Dato</option>
+            <option>Cita textual</option>
+            <option>Riesgo</option>
+            <option>Conclusión</option>
+            <option>Otro</option>
+        </datalist>
+    </div>
+    <div class="botones-modal"><button id="btnGuardarNota">Guardar</button><button id="btnCancelarNota" class="btn-sec">Cancelar</button></div>
+</div></div>
+<div id="modalMatriz" class="modal"><div class="modal-contenido"><h3 id="matrizTitulo">📊 Matriz de datos</h3><div id="matrizContenido"></div><div class="botones-modal"><button id="btnExportarMatrizCSV" class="btn-sec">📎 Exportar a CSV</button><button id="btnCerrarMatriz" class="btn-sec">Cerrar</button></div></div></div>
+<div id="modalCita" class="modal"><div class="modal-contenido"><h3>📝 Cita APA (7ª edición)</h3><div id="citaTexto" class="cita-texto"></div><div class="botones-modal"><button id="btnCopiarCita" class="btn-copiar">📋 Copiar cita</button><button id="btnCerrarCita" class="btn-sec">Cerrar</button></div></div></div>
+
+<!-- Modal editor Markdown -->
+<div id="modalMarkdown" class="modal">
+    <div class="modal-contenido" style="max-width: 1400px;">
+        <h3>✏️ Editor Markdown</h3>
+        <div class="markdown-toolbar">
+            <button type="button" data-md="bold" title="Negrita (Ctrl+B)">B</button>
+            <button type="button" data-md="italic" title="Cursiva (Ctrl+I)"><i>I</i></button>
+            <button type="button" data-md="heading" title="Título">H1</button>
+            <button type="button" data-md="list-ul" title="Lista desordenada">•</button>
+            <button type="button" data-md="list-ol" title="Lista ordenada">1.</button>
+            <button type="button" data-md="link" title="Enlace">🔗</button>
+            <button type="button" data-md="image" title="Imagen">🖼️</button>
+            <button type="button" data-md="table" title="Tabla">📊</button>
+            <button type="button" data-md="code" title="Código inline">{ }</button>
+            <button type="button" data-md="codeblock" title="Bloque de código">```</button>
+            <button type="button" data-md="quote" title="Cita">❝</button>
+            <button type="button" data-md="separator" title="Línea horizontal">---</button>
+        </div>
+        <div class="editor-markdown-container">
+            <div><label>📝 Código Markdown (editable)</label><textarea id="editorMarkdown" rows="20" style="font-family: monospace;"></textarea></div>
+            <div><label>👁️ Vista previa</label><div id="vistaPreviaMarkdown" class="vista-previa"></div></div>
+        </div>
+        <div class="botones-modal"><button id="btnCopiarMarkdown" class="btn-sec">📋 Copiar</button><button id="btnDescargarMarkdown" class="btn-sec">💾 Descargar .md</button><button id="btnCerrarMarkdown" class="btn-sec">Cerrar</button></div>
+    </div>
+</div>
+
+<script>
+    // ---------- GLOBALES ----------
+    let SQL = null;
+    let db = null;
+    let dbInitialized = false;
+    let temaActivoId = null;
+    let fuenteEnEdicionId = null;
+    let notaEnEdicion = null;
+    let matrizFuenteActual = null;
+    let currentMarkdownContent = '';
+    let currentMarkdownFilename = 'reporte.md';
+    let vistaActual = 'tabla'; // 'tabla' o 'tarjetas'
+
+    // ---------- INICIALIZAR SQLITE ----------
+    async function initDatabase() {
+        return new Promise((resolve, reject) => {
+            const config = { locateFile: filename => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${filename}` };
+            initSqlJs(config).then(sql => {
+                SQL = sql;
+                db = new SQL.Database();
+                db.run(`CREATE TABLE IF NOT EXISTS temas (id TEXT PRIMARY KEY, nombre TEXT NOT NULL)`);
+                db.run(`CREATE TABLE IF NOT EXISTS fuentes (id TEXT PRIMARY KEY, tema_id TEXT NOT NULL, titulo TEXT NOT NULL, url TEXT, fecha_consulta TEXT, tipo TEXT, autores TEXT, FOREIGN KEY(tema_id) REFERENCES temas(id))`);
+                db.run(`CREATE TABLE IF NOT EXISTS notas (id TEXT PRIMARY KEY, fuente_id TEXT NOT NULL, ubicacion TEXT, texto TEXT NOT NULL, fecha TEXT, categoria TEXT, FOREIGN KEY(fuente_id) REFERENCES fuentes(id))`);
+                db.run("CREATE INDEX IF NOT EXISTS idx_fuentes_tema ON fuentes(tema_id)");
+                db.run("CREATE INDEX IF NOT EXISTS idx_notas_fuente ON notas(fuente_id)");
+                dbInitialized = true;
+                resolve();
+            }).catch(err => reject(err));
+        });
+    }
+
+    function generarId() { return Date.now() + '-' + Math.random().toString(36).substring(2,8); }
+    function escapeHtml(s) { return s.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+
+    // ---------- CRUD ----------
+    function listarTemas() { if (!db) return []; const stmt = db.prepare("SELECT id, nombre FROM temas ORDER BY nombre"); const temas = []; while (stmt.step()) temas.push(stmt.getAsObject()); stmt.free(); return temas; }
+    function crearTema(nombre) { if (!nombre.trim()) return null; const id = generarId(); db.run("INSERT INTO temas (id, nombre) VALUES (?, ?)", [id, nombre.trim()]); return id; }
+    function eliminarTema(temaId) { db.run("DELETE FROM notas WHERE fuente_id IN (SELECT id FROM fuentes WHERE tema_id = ?)", [temaId]); db.run("DELETE FROM fuentes WHERE tema_id = ?", [temaId]); db.run("DELETE FROM temas WHERE id = ?", [temaId]); }
+    function actualizarTema(temaId, nuevoNombre) { db.run("UPDATE temas SET nombre = ? WHERE id = ?", [nuevoNombre, temaId]); }
+    function contarFuentes(temaId) { const stmt = db.prepare("SELECT COUNT(*) as total FROM fuentes WHERE tema_id = ?", [temaId]); if (stmt.step()) return stmt.getAsObject().total; stmt.free(); return 0; }
+    function listarFuentes(temaId) { const stmt = db.prepare("SELECT * FROM fuentes WHERE tema_id = ? ORDER BY titulo", [temaId]); const fuentes = []; while (stmt.step()) fuentes.push(stmt.getAsObject()); stmt.free(); return fuentes; }
+    function obtenerFuente(fuenteId) { const stmt = db.prepare("SELECT * FROM fuentes WHERE id = ?", [fuenteId]); if (stmt.step()) return stmt.getAsObject(); stmt.free(); return null; }
+    function guardarFuente(temaId, fuenteId, datos) { if (fuenteId) { db.run(`UPDATE fuentes SET titulo = ?, url = ?, fecha_consulta = ?, tipo = ?, autores = ? WHERE id = ?`, [datos.titulo, datos.url, datos.fechaConsulta, datos.tipo, datos.autores, fuenteId]); return fuenteId; } else { const newId = generarId(); db.run(`INSERT INTO fuentes (id, tema_id, titulo, url, fecha_consulta, tipo, autores) VALUES (?, ?, ?, ?, ?, ?, ?)`, [newId, temaId, datos.titulo, datos.url, datos.fechaConsulta, datos.tipo, datos.autores]); return newId; } }
+    function eliminarFuente(fuenteId) { db.run("DELETE FROM notas WHERE fuente_id = ?", [fuenteId]); db.run("DELETE FROM fuentes WHERE id = ?", [fuenteId]); }
+    function listarNotas(fuenteId) { const stmt = db.prepare("SELECT * FROM notas WHERE fuente_id = ? ORDER BY fecha DESC", [fuenteId]); const notas = []; while (stmt.step()) notas.push(stmt.getAsObject()); stmt.free(); return notas; }
+    function guardarNota(fuenteId, notaId, datos) { if (notaId) { db.run(`UPDATE notas SET ubicacion = ?, texto = ?, fecha = ?, categoria = ? WHERE id = ?`, [datos.ubicacion, datos.texto, datos.fecha, datos.categoria || '', notaId]); return notaId; } else { const newId = generarId(); db.run(`INSERT INTO notas (id, fuente_id, ubicacion, texto, fecha, categoria) VALUES (?, ?, ?, ?, ?, ?)`, [newId, fuenteId, datos.ubicacion, datos.texto, datos.fecha, datos.categoria || '']); return newId; } }
+    function eliminarNota(notaId) { db.run("DELETE FROM notas WHERE id = ?", [notaId]); }
+
+    // ---------- MARKDOWN Y CITAS ----------
+    function generarMarkdownFuente(fuente) { const notas = listarNotas(fuente.id); let md = `# ${fuente.titulo}\n\n**Autores:** ${fuente.autores || 'No especificado'}\n**Año:** ${fuente.fecha_consulta || 's.f.'}\n**Tipo:** ${fuente.tipo || 'No especificado'}\n**URL:** ${fuente.url || 'No disponible'}\n\n`; if (notas.length === 0) { md += `*No hay notas registradas.*\n\n`; } else { md += `## Notas de lectura\n\n`; notas.forEach((n, idx) => { md += `### Nota ${idx+1}\n- **Ubicación:** ${n.ubicacion || 'Sin ubicación'}\n- **Fecha:** ${n.fecha || 'Sin fecha'}\n- **Categoría:** ${n.categoria || 'Sin categoría'}\n- **Contenido:**\n  ${n.texto.replace(/\n/g, '\n  ')}\n\n`; }); } const totalPalabras = notas.reduce((sum, n) => sum + (n.texto.split(/\s+/).length), 0); md += `---\n**Estadísticas:** ${notas.length} nota(s), ${totalPalabras} palabra(s) totales.\n\n**Cita APA:** ${generarCitaAPA(fuente).replace(/<[^>]*>/g, '')}\n`; return md; }
+    function generarMarkdownTema(temaId) { const tema = listarTemas().find(t => t.id === temaId); if (!tema) return ''; const fuentes = listarFuentes(temaId); let md = `# Reporte de investigación: ${tema.nombre}\n\n**Fecha de generación:** ${new Date().toLocaleString()}\n**Total de fuentes:** ${fuentes.length}\n\n---\n\n`; for (let f of fuentes) { md += `## ${f.titulo}\n\n**Autores:** ${f.autores || 'No especificado'}\n**Año:** ${f.fecha_consulta || 's.f.'}\n**Tipo:** ${f.tipo || 'No especificado'}\n**URL:** ${f.url || 'No disponible'}\n\n`; const notas = listarNotas(f.id); if (notas.length === 0) { md += `*Sin notas.*\n\n`; } else { md += `### Notas de lectura\n\n`; notas.forEach((n, idx) => { md += `#### Nota ${idx+1}\n- **Ubicación:** ${n.ubicacion || 'Sin ubicación'}\n- **Fecha:** ${n.fecha || 'Sin fecha'}\n- **Categoría:** ${n.categoria || 'Sin categoría'}\n- **Contenido:**\n  ${n.texto.replace(/\n/g, '\n  ')}\n\n`; }); } const cita = generarCitaAPA(f).replace(/<[^>]*>/g, ''); md += `**Cita APA:** ${cita}\n\n---\n\n`; } const totalNotas = fuentes.reduce((sum, f) => sum + listarNotas(f.id).length, 0); const totalPalabras = fuentes.reduce((sum, f) => sum + listarNotas(f.id).reduce((s, n) => s + n.texto.split(/\s+/).length, 0), 0); md += `## Resumen global\n\n- **Fuentes analizadas:** ${fuentes.length}\n- **Total de notas:** ${totalNotas}\n- **Total de palabras en notas:** ${totalPalabras}\n`; return md; }
+    function generarCitaAPA(fuente) { let autores = fuente.autores || "Autor(es) desconocido(s)"; let año = fuente.fecha_consulta?.match(/^\d{4}/) ? fuente.fecha_consulta.match(/^\d{4}/)[0] : "s.f."; let titulo = fuente.titulo; let tipo = fuente.tipo ? `[${fuente.tipo}]` : ""; let url = fuente.url ? `Recuperado de ${fuente.url}` : ""; return `${autores} (${año}). *${titulo}* ${tipo}. ${url}`.trim().replace(/\s+/g, ' '); }
+    function mostrarCitaAPA(fuenteId) { const fuente = obtenerFuente(fuenteId); if (!fuente) return; const cita = generarCitaAPA(fuente); document.getElementById('citaTexto').innerHTML = escapeHtml(cita); document.getElementById('modalCita').style.display = 'flex'; window.citaPlana = cita; }
+    function copiarCita() { if(window.citaPlana) { navigator.clipboard.writeText(window.citaPlana); alert('Cita copiada'); } }
+
+    // ---------- MATRIZ DE HALLAZGOS CON FILTROS Y VISTA TARJETAS ----------
+    function mostrarMatrizHallazgos(temaId) {
+        const tema = listarTemas().find(t => t.id === temaId);
+        if (!tema) return;
+        const fuentes = listarFuentes(temaId);
+        let todasNotas = [];
+        for (let f of fuentes) {
+            const notas = listarNotas(f.id);
+            for (let n of notas) {
+                todasNotas.push({
+                    id: n.id,
+                    fuente: f.titulo,
+                    autores: f.autores || '',
+                    anio: f.fecha_consulta || '',
+                    ubicacion: n.ubicacion || '—',
+                    texto: n.texto,
+                    categoria: n.categoria || '',
+                    fuenteId: f.id
+                });
+            }
+        }
+        // Construir modal con filtro y selector de vista
+        const modalDiv = document.createElement('div');
+        modalDiv.id = 'modalMatrizHallazgos';
+        modalDiv.className = 'modal';
+        modalDiv.style.display = 'flex';
+        modalDiv.innerHTML = `
+            <div class="modal-contenido" style="max-width:1200px;">
+                <h3>📊 Matriz de hallazgos - ${escapeHtml(tema.nombre)}</h3>
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">
+                    <div class="campo" style="flex:1;"><label>🔍 Filtrar por categoría</label>
+                        <select id="filtroCategoria" style="border-radius:2rem;">
+                            <option value="TODAS">Todas las categorías</option>
+                            ${Array.from(new Set(todasNotas.map(n => n.categoria))).filter(c => c).sort().map(c => `<option value="${c}">${c}</option>`).join('')}
+                            <option value="SIN_CATEGORIA">Sin categoría</option>
+                        </select>
+                    </div>
+                    <div><label>📄 Vista:</label>
+                        <button id="vistaTablaBtn" class="btn-sec ${vistaActual === 'tabla' ? 'active' : ''}" style="background:${vistaActual === 'tabla' ? '#2c7da0' : '#5f7f8c'};">📋 Tabla</button>
+                        <button id="vistaTarjetasBtn" class="btn-sec ${vistaActual === 'tarjetas' ? 'active' : ''}" style="background:${vistaActual === 'tarjetas' ? '#2c7da0' : '#5f7f8c'};">🃏 Tarjetas</button>
+                    </div>
+                </div>
+                <div id="contenedorMatrizHallazgos"></div>
+                <div class="botones-modal">
+                    <button id="exportarMatrizHallazgosCSV" class="btn-sec">📎 Exportar CSV</button>
+                    <button id="cerrarMatrizHallazgos" class="btn-sec">Cerrar</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modalDiv);
+        const contenedor = document.getElementById('contenedorMatrizHallazgos');
+        const filtroSelect = document.getElementById('filtroCategoria');
+        const vistaTablaBtn = document.getElementById('vistaTablaBtn');
+        const vistaTarjetasBtn = document.getElementById('vistaTarjetasBtn');
+
+        function actualizarVista() {
+            const filtro = filtroSelect.value;
+            let notasFiltradas = todasNotas;
+            if (filtro === 'SIN_CATEGORIA') notasFiltradas = todasNotas.filter(n => !n.categoria);
+            else if (filtro !== 'TODAS') notasFiltradas = todasNotas.filter(n => n.categoria === filtro);
+            if (vistaActual === 'tabla') {
+                renderTabla(notasFiltradas);
+            } else {
+                renderTarjetas(notasFiltradas);
+            }
+        }
+
+        function renderTabla(notas) {
+            let html = `<table class="matriz-tabla" id="matrizHallazgosTabla">
+                            <thead><tr><th>Fuente</th><th>Autores/Año</th><th>Ubicación</th><th>Hallazgo / Nota</th><th>Categoría</th><th>Acción</th></tr></thead>
+                            <tbody>`;
+            for (let n of notas) {
+                html += `<tr data-nota-id="${n.id}">
+                            <td>${escapeHtml(n.fuente)}</td>
+                            <td>${escapeHtml(n.autores)} ${n.anio ? `(${n.anio})` : ''}</td>
+                            <td>${escapeHtml(n.ubicacion)}</td>
+                            <td>${escapeHtml(n.texto)}</td>
+                            <td><input type="text" class="categoria-input" data-id="${n.id}" value="${escapeHtml(n.categoria)}" list="categoriasList" style="width:100%;"><datalist id="categoriasList">${Array.from(new Set(todasNotas.map(nn => nn.categoria))).filter(c=>c).map(c=>`<option>${c}</option>`).join('')}</datalist></td>
+                            <td><button class="guardar-categoria" data-id="${n.id}">💾 Guardar</button></td>
+                         </tr>`;
+            }
+            if (notas.length === 0) html += '<tr><td colspan="6">No hay notas con este filtro.</td></tr>';
+            html += `</tbody></table>`;
+            contenedor.innerHTML = html;
+            // Eventos guardar categoría
+            document.querySelectorAll('.guardar-categoria').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const notaId = btn.getAttribute('data-id');
+                    const input = btn.closest('tr').querySelector('.categoria-input');
+                    const nuevaCategoria = input.value.trim();
+                    db.run("UPDATE notas SET categoria = ? WHERE id = ?", [nuevaCategoria, notaId]);
+                    alert('Categoría guardada');
+                    // Recargar matriz para actualizar opciones de filtro
+                    mostrarMatrizHallazgos(temaId);
+                });
+            });
+        }
+
+        function renderTarjetas(notas) {
+            let html = `<div class="tarjetas-container">`;
+            for (let n of notas) {
+                html += `<div class="tarjeta-nota" data-nota-id="${n.id}">
+                            <div class="tarjeta-fuente">📄 ${escapeHtml(n.fuente)}</div>
+                            <div class="tarjeta-autores">${escapeHtml(n.autores)} ${n.anio ? `(${n.anio})` : ''}</div>
+                            <div class="tarjeta-ubicacion">📍 ${escapeHtml(n.ubicacion)}</div>
+                            <div class="tarjeta-texto">${escapeHtml(n.texto)}</div>
+                            <div class="tarjeta-categoria">
+                                <select class="categoria-select" data-id="${n.id}" style="flex:1; border-radius:1rem; padding:0.3rem;">
+                                    <option value="">Sin categoría</option>
+                                    ${Array.from(new Set(todasNotas.map(nn => nn.categoria))).filter(c=>c).map(c => `<option value="${c}" ${n.categoria === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                </select>
+                                <button class="guardar-categoria-tarjeta" data-id="${n.id}">💾</button>
+                            </div>
+                         </div>`;
+            }
+            if (notas.length === 0) html += '<p>No hay notas con este filtro.</p>';
+            html += `</div>`;
+            contenedor.innerHTML = html;
+            // Eventos para guardar categoría desde tarjeta
+            document.querySelectorAll('.guardar-categoria-tarjeta').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const notaId = btn.getAttribute('data-id');
+                    const select = btn.closest('.tarjeta-nota').querySelector('.categoria-select');
+                    const nuevaCategoria = select.value;
+                    db.run("UPDATE notas SET categoria = ? WHERE id = ?", [nuevaCategoria, notaId]);
+                    alert('Categoría guardada');
+                    mostrarMatrizHallazgos(temaId);
+                });
+            });
+        }
+
+        filtroSelect.addEventListener('change', () => actualizarVista());
+        vistaTablaBtn.addEventListener('click', () => { vistaActual = 'tabla'; actualizarVista(); });
+        vistaTarjetasBtn.addEventListener('click', () => { vistaActual = 'tarjetas'; actualizarVista(); });
+        actualizarVista();
+
+        document.getElementById('exportarMatrizHallazgosCSV')?.addEventListener('click', () => exportarMatrizHallazgosCSV(tema.nombre, filtroSelect.value));
+        document.getElementById('cerrarMatrizHallazgos')?.addEventListener('click', () => modalDiv.remove());
+    }
+
+    function exportarMatrizHallazgosCSV(temaNombre, filtro) {
+        const tabla = document.getElementById('matrizHallazgosTabla');
+        if (!tabla) { alert('Primero cambia a vista de tabla para exportar'); return; }
+        const filas = tabla.querySelectorAll('tbody tr');
+        let csv = [['Fuente','Autores/Año','Ubicación','Hallazgo','Categoría'].join(',')];
+        filas.forEach(row => {
+            const celdas = row.querySelectorAll('td');
+            if (celdas.length >= 5 && row.cells) {
+                const fuente = row.cells[0].innerText.replace(/,/g, ';');
+                const autores = row.cells[1].innerText.replace(/,/g, ';');
+                const ubicacion = row.cells[2].innerText.replace(/,/g, ';');
+                const hallazgo = row.cells[3].innerText.replace(/,/g, ';');
+                const categoriaInput = row.cells[4].querySelector('input');
+                const categoria = categoriaInput ? categoriaInput.value.replace(/,/g, ';') : '';
+                csv.push([fuente, autores, ubicacion, hallazgo, categoria].join(','));
+            }
+        });
+        const blob = new Blob([csv.join('\n')], {type: 'text/csv'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `matriz_hallazgos_${temaNombre.replace(/\s/g, '_')}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    // ---------- RENDERIZADO PRINCIPAL (similar al anterior, pero con matriz mejorada) ----------
+    function renderizarTemas() {
+        const container = document.getElementById('temasLista');
+        const temas = listarTemas();
+        container.innerHTML = '';
+        if (!temas.length) { container.innerHTML = '<div style="padding:1rem; text-align:center;">📭 Crea un tema o importa datos.</div>'; return; }
+        temas.forEach(t => {
+            const div = document.createElement('div'); div.className = `tema-item ${temaActivoId === t.id ? 'tema-activo' : ''}`;
+            div.innerHTML = `<div class="tema-info"><div class="tema-nombre">📂 ${escapeHtml(t.nombre)}</div><div class="tema-fechas">Fuentes: ${contarFuentes(t.id)}</div></div>
+                <div><button class="btn-accion btn-editar" data-editar-tema="${t.id}">✏️</button><button class="btn-accion" data-eliminar-tema="${t.id}">🗑️</button></div>`;
+            div.addEventListener('click', (e) => { if (e.target.tagName !== 'BUTTON') seleccionarTema(t.id); });
+            container.appendChild(div);
+        });
+        document.querySelectorAll('[data-editar-tema]').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); editarTema(btn.getAttribute('data-editar-tema')); }));
+        document.querySelectorAll('[data-eliminar-tema]').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); if (confirm('¿Eliminar tema y todo su contenido?')) { eliminarTema(btn.getAttribute('data-eliminar-tema')); renderizarTodo(); } }));
+    }
+
+    function seleccionarTema(id) { temaActivoId = id; renderizarTemas(); renderizarDetalle(); }
+
+    function renderizarDetalle() {
+        const tema = listarTemas().find(t => t.id === temaActivoId);
+        const tituloElem = document.getElementById('temaSeleccionadoTitulo');
+        const detalleElem = document.getElementById('contenidoDetalle');
+        if (!tema) { tituloElem.innerHTML = '📖 Ningún tema seleccionado'; detalleElem.innerHTML = '<p style="text-align:center;">Selecciona un tema.</p>'; return; }
+        tituloElem.innerHTML = `📖 ${escapeHtml(tema.nombre)}`;
+        const fuentes = listarFuentes(tema.id);
+        let html = `<div class="toolbar" style="justify-content: flex-start;">
+                        <button id="btnAgregarFuente">➕ Nueva fuente</button>
+                        <button id="btnGenerarPDFTema" class="btn-sec">📄 PDF de este tema</button>
+                        <button id="btnMarkdownTema" class="btn-sec">📝 Reporte MD del tema</button>
+                        <button id="btnMatrizHallazgos" class="btn-sec">📊 Matriz de hallazgos</button>
+                    </div>`;
+        if (!fuentes.length) html += '<p>📭 Sin fuentes. Agrega una.</p>';
+        else {
+            fuentes.forEach(f => {
+                const notas = listarNotas(f.id);
+                html += `<div style="background:#fefaf5; border-radius:1.2rem; padding:1rem; margin-bottom:1.5rem; border:1px solid #e2dcd5;">
+                    <div style="display:flex; justify-content:space-between; flex-wrap:wrap; align-items:center;">
+                        <div><strong>📄 ${escapeHtml(f.titulo)}</strong> ${f.tipo ? `<span class="badge">${escapeHtml(f.tipo)}</span>` : ''} ${f.autores ? `<span class="badge">${escapeHtml(f.autores)}</span>` : ''}</div>
+                        <div>
+                            <button class="btn-accion btn-editar" data-editar-fuente="${f.id}">✏️ Editar fuente</button>
+                            <button class="btn-accion" data-eliminar-fuente="${f.id}">🗑️ Eliminar</button>
+                            <button class="btn-accion" data-matriz-fuente="${f.id}" style="background:#2c7da0;">📊 Matriz</button>
+                            <button class="btn-accion" data-cita-fuente="${f.id}" style="background:#9b6a3c;">📝 Cita APA</button>
+                            <button class="btn-accion" data-markdown-fuente="${f.id}" style="background:#6b4e2e;">📄 Reporte MD</button>
+                        </div>
+                    </div>
+                    <div><a href="${escapeHtml(f.url)}" target="_blank" style="color:#2c7da0;">${escapeHtml(f.url)}</a> | Consulta: ${f.fecha_consulta || '—'}</div>
+                    <div style="margin-top:0.8rem;"><strong>📌 Notas de lectura:</strong> <button class="btn-accion btn-editar" data-agregar-nota="${f.id}" style="padding:2px 8px;">➕ Agregar nota</button></div>
+                    <div class="notas-lista">`;
+                if (notas.length) {
+                    notas.forEach(n => {
+                        html += `<div class="nota-item">
+                            <div class="nota-ref">📍 ${escapeHtml(n.ubicacion)} | ${n.fecha || '—'} | 🏷️ ${escapeHtml(n.categoria || 'Sin categoría')}</div>
+                            <div>${escapeHtml(n.texto)}</div>
+                            <div style="text-align:right; margin-top:4px;">
+                                <button class="btn-accion btn-editar" data-editar-nota="${f.id}|${n.id}">✏️</button>
+                                <button class="btn-accion" data-eliminar-nota="${n.id}">🗑️</button>
+                            </div>
+                        </div>`;
+                    });
+                } else html += '<div class="nota-item" style="color:#7f8c8d;">Sin notas aún.</div>';
+                html += `</div></div>`;
+            });
+        }
+        detalleElem.innerHTML = html;
+        document.getElementById('btnAgregarFuente')?.addEventListener('click', () => abrirModalFuente(null));
+        document.getElementById('btnGenerarPDFTema')?.addEventListener('click', () => generarPDFTema(tema.id));
+        document.getElementById('btnMarkdownTema')?.addEventListener('click', () => { const md = generarMarkdownTema(tema.id); abrirEditorMarkdown(md, `reporte_tema_${tema.nombre.replace(/\s/g, '_')}.md`); });
+        document.getElementById('btnMatrizHallazgos')?.addEventListener('click', () => mostrarMatrizHallazgos(tema.id));
+        document.querySelectorAll('[data-editar-fuente]').forEach(btn => btn.addEventListener('click', () => abrirModalFuente(btn.getAttribute('data-editar-fuente'))));
+        document.querySelectorAll('[data-eliminar-fuente]').forEach(btn => btn.addEventListener('click', () => { if(confirm('¿Eliminar fuente y sus notas?')) eliminarFuente(btn.getAttribute('data-eliminar-fuente')); renderizarTodo(); }));
+        document.querySelectorAll('[data-matriz-fuente]').forEach(btn => btn.addEventListener('click', () => mostrarMatrizFuente(btn.getAttribute('data-matriz-fuente'))));
+        document.querySelectorAll('[data-cita-fuente]').forEach(btn => btn.addEventListener('click', () => mostrarCitaAPA(btn.getAttribute('data-cita-fuente'))));
+        document.querySelectorAll('[data-markdown-fuente]').forEach(btn => btn.addEventListener('click', () => { const fuente = obtenerFuente(btn.getAttribute('data-markdown-fuente')); if (fuente) { const md = generarMarkdownFuente(fuente); abrirEditorMarkdown(md, `reporte_${fuente.titulo.replace(/\s/g, '_')}.md`); } }));
+        document.querySelectorAll('[data-agregar-nota]').forEach(btn => btn.addEventListener('click', () => abrirModalNota(btn.getAttribute('data-agregar-nota'), null)));
+        document.querySelectorAll('[data-editar-nota]').forEach(btn => { const [fId, nId] = btn.getAttribute('data-editar-nota').split('|'); btn.addEventListener('click', () => abrirModalNota(fId, nId)); });
+        document.querySelectorAll('[data-eliminar-nota]').forEach(btn => btn.addEventListener('click', () => { if(confirm('¿Eliminar nota?')) eliminarNota(btn.getAttribute('data-eliminar-nota')); renderizarTodo(); }));
+    }
+
+    function renderizarTodo() { renderizarTemas(); if (temaActivoId) renderizarDetalle(); else document.getElementById('contenidoDetalle').innerHTML = '<p style="text-align:center;">Selecciona un tema.</p>'; }
+
+    // ---------- MODALES FUENTE Y NOTA ----------
+    function abrirModalFuente(fuenteId) {
+        const temaId = temaActivoId;
+        if (!temaId) { alert('Primero selecciona un tema'); return; }
+        if (fuenteId) {
+            const fuente = obtenerFuente(fuenteId);
+            if (fuente) {
+                fuenteEnEdicionId = fuenteId;
+                document.getElementById('modalFuenteTitulo').innerText = '✏️ Editar fuente';
+                document.getElementById('fuenteTitulo').value = fuente.titulo;
+                document.getElementById('fuenteUrl').value = fuente.url || '';
+                document.getElementById('fuenteFecha').value = fuente.fecha_consulta || '';
+                document.getElementById('fuenteTipo').value = fuente.tipo || '';
+                document.getElementById('fuenteAutores').value = fuente.autores || '';
+            } else return;
+        } else {
+            fuenteEnEdicionId = null;
+            document.getElementById('modalFuenteTitulo').innerText = '➕ Nueva fuente';
+            document.getElementById('fuenteTitulo').value = '';
+            document.getElementById('fuenteUrl').value = '';
+            document.getElementById('fuenteFecha').value = '';
+            document.getElementById('fuenteTipo').value = '';
+            document.getElementById('fuenteAutores').value = '';
+        }
+        document.getElementById('modalFuente').style.display = 'flex';
+    }
+
+    function guardarFuenteModal() {
+        const temaId = temaActivoId;
+        if (!temaId) return;
+        const datos = {
+            titulo: document.getElementById('fuenteTitulo').value.trim(),
+            url: document.getElementById('fuenteUrl').value,
+            fechaConsulta: document.getElementById('fuenteFecha').value,
+            tipo: document.getElementById('fuenteTipo').value,
+            autores: document.getElementById('fuenteAutores').value
+        };
+        if (!datos.titulo) { alert('El título es obligatorio'); return; }
+        guardarFuente(temaId, fuenteEnEdicionId, datos);
+        cerrarModalFuente();
+        renderizarTodo();
+    }
+
+    function cerrarModalFuente() { document.getElementById('modalFuente').style.display = 'none'; fuenteEnEdicionId = null; }
+
+    function abrirModalNota(fuenteId, notaId) {
+        const fuente = obtenerFuente(fuenteId);
+        if (!fuente) return;
+        if (notaId) {
+            const stmt = db.prepare("SELECT * FROM notas WHERE id = ?", [notaId]);
+            if (stmt.step()) {
+                const nota = stmt.getAsObject();
+                notaEnEdicion = { fuenteId, notaId };
+                document.getElementById('modalNotaTitulo').innerText = '✏️ Editar nota';
+                document.getElementById('notaUbicacion').value = nota.ubicacion;
+                document.getElementById('notaTexto').value = nota.texto;
+                document.getElementById('notaFecha').value = nota.fecha;
+                document.getElementById('notaCategoria').value = nota.categoria || '';
+            } else return;
+            stmt.free();
+        } else {
+            notaEnEdicion = null;
+            document.getElementById('modalNotaTitulo').innerText = '➕ Nueva nota';
+            document.getElementById('notaUbicacion').value = '';
+            document.getElementById('notaTexto').value = '';
+            document.getElementById('notaFecha').value = new Date().toISOString().split('T')[0];
+            document.getElementById('notaCategoria').value = '';
+        }
+        window.modalNotaFuenteId = fuenteId;
+        document.getElementById('modalNota').style.display = 'flex';
+    }
+
+    function guardarNotaModal() {
+        const fuenteId = window.modalNotaFuenteId;
+        if (!fuenteId) return;
+        const datos = {
+            ubicacion: document.getElementById('notaUbicacion').value.trim(),
+            texto: document.getElementById('notaTexto').value.trim(),
+            fecha: document.getElementById('notaFecha').value,
+            categoria: document.getElementById('notaCategoria').value.trim()
+        };
+        if (!datos.texto) { alert('El contenido de la nota es obligatorio'); return; }
+        guardarNota(fuenteId, notaEnEdicion?.notaId || null, datos);
+        cerrarModalNota();
+        renderizarTodo();
+    }
+
+    function cerrarModalNota() { document.getElementById('modalNota').style.display = 'none'; notaEnEdicion = null; }
+
+    // ---------- MATRIZ DE DATOS (por fuente) ----------
+    function mostrarMatrizFuente(fuenteId) {
+        const fuente = obtenerFuente(fuenteId);
+        if (!fuente) return;
+        matrizFuenteActual = fuente;
+        const notas = listarNotas(fuenteId);
+        document.getElementById('matrizTitulo').innerText = `📊 Matriz de datos: ${escapeHtml(fuente.titulo)}`;
+        let html = `<div style="margin-bottom: 1rem;"><strong>Autores:</strong> ${escapeHtml(fuente.autores) || '—'} | <strong>Tipo:</strong> ${escapeHtml(fuente.tipo) || '—'} | <strong>URL:</strong> <a href="${escapeHtml(fuente.url)}" target="_blank">${escapeHtml(fuente.url)}</a></div>`;
+        if (!notas.length) html += '<p>No hay notas registradas.</p>';
+        else {
+            html += `<table class="matriz-tabla"><thead><tr><th>#</th><th>Ubicación</th><th>Categoría</th><th>Nota</th><th>Fecha</th></tr></thead><tbody>`;
+            notas.forEach((n, i) => {
+                html += `<tr><td>${i+1}</td><td>${escapeHtml(n.ubicacion)}</td><td>${escapeHtml(n.categoria || '—')}</td><td>${escapeHtml(n.texto)}</td><td>${n.fecha || '—'}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+        }
+        document.getElementById('matrizContenido').innerHTML = html;
+        document.getElementById('modalMatriz').style.display = 'flex';
+    }
+
+    function exportarMatrizCSV() {
+        if (!matrizFuenteActual) return;
+        const fuente = matrizFuenteActual;
+        const notas = listarNotas(fuente.id);
+        let csv = [['"#","Ubicación","Categoría","Nota","Fecha"'].join(',')];
+        notas.forEach((n, i) => {
+            csv.push([i+1, `"${n.ubicacion.replace(/"/g, '""')}"`, `"${(n.categoria || '').replace(/"/g, '""')}"`, `"${n.texto.replace(/"/g, '""')}"`, `"${n.fecha || ''}"`].join(','));
+        });
+        const blob = new Blob([csv.join('\n')], {type:'text/csv'});
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `matriz_${fuente.titulo.replace(/\s/g, '_')}.csv`; a.click(); URL.revokeObjectURL(a.href);
+    }
+
+    // ---------- BÚSQUEDA ----------
+    function buscarGlobal(termino) {
+        if (!termino.trim()) { alert('Escribe una palabra'); return; }
+        const term = `%${termino.toLowerCase()}%`;
+        const temasRes = db.exec("SELECT id, nombre FROM temas WHERE LOWER(nombre) LIKE ?", [term]);
+        const fuentesRes = db.exec("SELECT f.id, f.titulo, f.autores, t.id as tema_id, t.nombre as tema_nombre FROM fuentes f JOIN temas t ON f.tema_id = t.id WHERE LOWER(f.titulo) LIKE ? OR LOWER(f.autores) LIKE ?", [term, term]);
+        const notasRes = db.exec("SELECT n.id, n.texto, n.ubicacion, f.id as fuente_id, f.titulo as fuente_titulo, t.id as tema_id, t.nombre as tema_nombre FROM notas n JOIN fuentes f ON n.fuente_id = f.id JOIN temas t ON f.tema_id = t.id WHERE LOWER(n.texto) LIKE ? OR LOWER(n.ubicacion) LIKE ?", [term, term]);
+        const resultados = [];
+        if (temasRes.length && temasRes[0].values) temasRes[0].values.forEach(row => { resultados.push({ tipo: 'tema', temaId: row[0], temaNombre: row[1], texto: `Tema: ${row[1]}` }); });
+        if (fuentesRes.length && fuentesRes[0].values) fuentesRes[0].values.forEach(row => { resultados.push({ tipo: 'fuente', temaId: row[3], temaNombre: row[4], fuenteId: row[0], texto: `Fuente: ${row[1]}` }); });
+        if (notasRes.length && notasRes[0].values) notasRes[0].values.forEach(row => { resultados.push({ tipo: 'nota', temaId: row[5], temaNombre: row[6], fuenteId: row[3], notaId: row[0], texto: `Nota: ${row[1].substring(0,100)}`, ubicacion: row[2] }); });
+        const container = document.getElementById('resultadosLista');
+        container.innerHTML = '';
+        if (!resultados.length) { container.innerHTML = '<p>No se encontraron coincidencias.</p>'; }
+        else {
+            resultados.forEach(res => {
+                const div = document.createElement('div'); div.className = 'resultado-item';
+                let html = `<strong>📁 ${escapeHtml(res.temaNombre)}</strong><br>`;
+                if (res.tipo === 'tema') html += `🎯 ${escapeHtml(res.texto)}`;
+                else if (res.tipo === 'fuente') html += `📄 ${escapeHtml(res.texto)}`;
+                else html += `📌 ${escapeHtml(res.texto)}<br><span class="badge">📍 ${escapeHtml(res.ubicacion || '')}</span>`;
+                div.innerHTML = html;
+                div.addEventListener('click', () => {
+                    seleccionarTema(res.temaId);
+                    document.getElementById('modalResultados').style.display = 'none';
+                    if (res.tipo !== 'tema') {
+                        setTimeout(() => {
+                            const elem = document.querySelector(`[data-editar-fuente="${res.fuenteId}"]`)?.closest('div[style*="background:#fefaf5"]');
+                            if (elem) elem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            if (res.tipo === 'nota') {
+                                const notaElem = document.querySelector(`[data-editar-nota^="${res.fuenteId}|${res.notaId}"]`)?.closest('.nota-item');
+                                if (notaElem) { notaElem.style.backgroundColor = '#ffecb3'; setTimeout(() => notaElem.style.backgroundColor = '', 2000); }
+                            }
+                        }, 150);
+                    }
+                });
+                container.appendChild(div);
+            });
+        }
+        document.getElementById('modalResultados').style.display = 'flex';
+    }
+
+    // ---------- IMPORTACIÓN/EXPORTACIÓN DB ----------
+    function exportarDB() { const data = db.export(); const blob = new Blob([data], {type: 'application/octet-stream'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `investigacion_${new Date().toISOString().slice(0,19)}.db`; a.click(); URL.revokeObjectURL(url); }
+    function importarDBReemplazar(file) { if (!SQL) { alert("La librería SQL no está lista."); return; } if (!confirm('⚠️ Esta acción reemplazará TODOS los datos actuales por los del archivo. ¿Continuar?')) return; const reader = new FileReader(); reader.onload = e => { try { const array = new Uint8Array(e.target.result); if (db) db.close(); db = new SQL.Database(array); dbInitialized = true; temaActivoId = null; renderizarTodo(); alert('Base de datos reemplazada correctamente.'); } catch (err) { alert('Error al importar: ' + err.message); } }; reader.readAsArrayBuffer(file); }
+    function importarDBCombinar(file) { if (!SQL) { alert("La librería SQL no está lista."); return; } const reader = new FileReader(); reader.onload = e => { try { const array = new Uint8Array(e.target.result); const newDb = new SQL.Database(array); const tablas = ['temas', 'fuentes', 'notas']; for (let tabla of tablas) { const stmt = newDb.prepare(`SELECT * FROM ${tabla}`); const columnNames = stmt.getColumnNames(); const insertStmt = db.prepare(`INSERT OR IGNORE INTO ${tabla} (${columnNames.join(',')}) VALUES (${columnNames.map(() => '?').join(',')})`); while (stmt.step()) { const row = stmt.get(); insertStmt.run(row); } insertStmt.free(); stmt.free(); } newDb.close(); renderizarTodo(); alert('Datos combinados correctamente (se añadieron nuevos registros sin duplicados).'); } catch (err) { alert('Error al combinar: ' + err.message); } }; reader.readAsArrayBuffer(file); }
+
+    // ---------- PDF ----------
+    async function generarPDFTema(temaId) {
+        const tema = listarTemas().find(t => t.id === temaId);
+        if (!tema) return;
+        const { jsPDF } = window.jspdf;
+        const div = document.createElement('div'); div.style.padding = '20px'; div.style.fontFamily = 'sans-serif'; div.style.backgroundColor = 'white';
+        div.innerHTML = `<h1>Tema: ${escapeHtml(tema.nombre)}</h1><p>${new Date().toLocaleString()}</p><hr>`;
+        const fuentes = listarFuentes(temaId);
+        for (let f of fuentes) {
+            div.innerHTML += `<h3>📄 ${escapeHtml(f.titulo)}</h3><p>URL: ${f.url || '—'} | Año: ${f.fecha_consulta || '—'} | Tipo: ${f.tipo || '—'} | Autores: ${f.autores || '—'}</p>`;
+            const notas = listarNotas(f.id);
+            if (notas.length) { div.innerHTML += `<ul>`; notas.forEach(n => div.innerHTML += `<li><strong>${escapeHtml(n.ubicacion)}</strong> (${n.fecha || '—'}): ${escapeHtml(n.texto)}</li>`); div.innerHTML += `</ul>`; }
+            else div.innerHTML += `<p>Sin notas.</p>`;
+            div.innerHTML += `<hr>`;
+        }
+        document.body.appendChild(div);
+        try {
+            const canvas = await html2canvas(div, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190; const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let pos = 0;
+            pdf.addImage(imgData, 'PNG', 10, pos, imgWidth, imgHeight);
+            if (imgHeight > 277) { let h = imgHeight - 277; while (h > 0) { pos = h - imgHeight; pdf.addPage(); pdf.addImage(imgData, 'PNG', 10, pos, imgWidth, imgHeight); h -= 277; } }
+            pdf.save(`tema_${tema.nombre.replace(/\s/g, '_')}.pdf`);
+        } catch(e) { alert('Error PDF'); } finally { document.body.removeChild(div); }
+    }
+
+    async function generarPDFGlobal() {
+        const temas = listarTemas();
+        if (!temas.length) { alert('No hay temas'); return; }
+        const { jsPDF } = window.jspdf;
+        const div = document.createElement('div'); div.style.padding = '20px'; div.style.fontFamily = 'sans-serif'; div.style.backgroundColor = 'white';
+        div.innerHTML = `<h1>Reporte Global</h1><p>${new Date().toLocaleString()}</p><hr>`;
+        for (let t of temas) {
+            div.innerHTML += `<h2>📌 ${escapeHtml(t.nombre)}</h2>`;
+            const fuentes = listarFuentes(t.id);
+            for (let f of fuentes) {
+                div.innerHTML += `<h3>📄 ${escapeHtml(f.titulo)}</h3><p>${f.url || '—'} | ${f.fecha_consulta || '—'} | ${f.tipo || ''} | ${f.autores || ''}</p>`;
+                const notas = listarNotas(f.id);
+                if (notas.length) { div.innerHTML += `<ul>`; notas.forEach(n => div.innerHTML += `<li><strong>${escapeHtml(n.ubicacion)}</strong>: ${escapeHtml(n.texto)} (${n.fecha})</li>`); div.innerHTML += `</ul>`; }
+                else div.innerHTML += `<p>Sin notas.</p>`;
+            }
+            div.innerHTML += `<hr>`;
+        }
+        document.body.appendChild(div);
+        try {
+            const canvas = await html2canvas(div, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190; const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let pos = 0;
+            pdf.addImage(imgData, 'PNG', 10, pos, imgWidth, imgHeight);
+            if (imgHeight > 277) { let h = imgHeight - 277; while (h > 0) { pos = h - imgHeight; pdf.addPage(); pdf.addImage(imgData, 'PNG', 10, pos, imgWidth, imgHeight); h -= 277; } }
+            pdf.save(`investigacion_global.pdf`);
+        } catch(e) { alert('Error PDF'); } finally { document.body.removeChild(div); }
+    }
+
+    function editarTema(id) {
+        const temas = listarTemas();
+        const tema = temas.find(t => t.id === id);
+        if (tema) {
+            let nuevo = prompt('Editar nombre del tema:', tema.nombre);
+            if (nuevo && nuevo.trim()) { actualizarTema(id, nuevo.trim()); renderizarTodo(); }
+        }
+    }
+
+    // ---------- EDITOR MARKDOWN ----------
+    function insertarMarkdown(prefix, suffix, defaultValue = '') {
+        const editor = document.getElementById('editorMarkdown');
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+        const selectedText = editor.value.substring(start, end);
+        const replacement = prefix + (selectedText || defaultValue) + suffix;
+        editor.value = editor.value.substring(0, start) + replacement + editor.value.substring(end);
+        editor.selectionStart = start + prefix.length;
+        editor.selectionEnd = start + prefix.length + (selectedText.length || defaultValue.length);
+        editor.focus();
+        actualizarVistaPrevia();
+    }
+
+    function configurarBarraHerramientas() {
+        const acciones = {
+            bold: { pre: '**', suf: '**', def: 'texto en negrita' },
+            italic: { pre: '*', suf: '*', def: 'texto en cursiva' },
+            heading: { pre: '# ', suf: '', def: 'Título' },
+            'list-ul': { pre: '- ', suf: '', def: 'Elemento de lista' },
+            'list-ol': { pre: '1. ', suf: '', def: 'Elemento numerado' },
+            link: { pre: '[', suf: '](url)', def: 'texto del enlace' },
+            image: { pre: '![', suf: '](url-imagen)', def: 'texto alternativo' },
+            table: { pre: '\n| Cabecera 1 | Cabecera 2 |\n|------------|------------|\n| Celda 1    | Celda 2    |\n', suf: '', def: '' },
+            code: { pre: '`', suf: '`', def: 'código' },
+            codeblock: { pre: '```\n', suf: '\n```', def: 'código' },
+            quote: { pre: '> ', suf: '', def: 'cita' },
+            separator: { pre: '\n---\n', suf: '', def: '' }
+        };
+        document.querySelectorAll('[data-md]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const action = btn.getAttribute('data-md');
+                if (acciones[action]) insertarMarkdown(acciones[action].pre, acciones[action].suf, acciones[action].def);
+            });
+        });
+    }
+
+    function abrirEditorMarkdown(contenidoInicial, nombreArchivo) {
+        currentMarkdownContent = contenidoInicial;
+        currentMarkdownFilename = nombreArchivo.endsWith('.md') ? nombreArchivo : nombreArchivo + '.md';
+        const editor = document.getElementById('editorMarkdown');
+        editor.value = contenidoInicial;
+        actualizarVistaPrevia();
+        document.getElementById('modalMarkdown').style.display = 'flex';
+    }
+
+    function actualizarVistaPrevia() {
+        const md = document.getElementById('editorMarkdown').value;
+        const html = marked.parse(md);
+        document.getElementById('vistaPreviaMarkdown').innerHTML = html;
+    }
+
+    function descargarMarkdownDesdeEditor() {
+        const contenido = document.getElementById('editorMarkdown').value;
+        const blob = new Blob([contenido], {type: 'text/markdown'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = currentMarkdownFilename;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function copiarMarkdown() {
+        const contenido = document.getElementById('editorMarkdown').value;
+        navigator.clipboard.writeText(contenido).then(() => alert('Markdown copiado al portapapeles'));
+    }
+
+    // ---------- INICIALIZACIÓN ----------
+    window.addEventListener('DOMContentLoaded', async () => {
+        await initDatabase();
+        if (listarTemas().length === 0) {
+            const temaIA = crearTema("Inteligencia Artificial");
+            const fuenteId = guardarFuente(temaIA, null, { titulo: "Deep Learning Book", url: "https://www.deeplearningbook.org/", fechaConsulta: "2016", tipo: "Libro", autores: "Goodfellow, I.; Bengio, Y.; Courville, A." });
+            guardarNota(fuenteId, null, { ubicacion: "Capítulo 1, p. 12", texto: "Definición de aprendizaje profundo como representaciones jerárquicas.", fecha: "2025-03-10", categoria: "Hallazgo" });
+            guardarNota(fuenteId, null, { ubicacion: "Sección 5.3, p. 120", texto: "Regularización: dropout y early stopping son clave.", fecha: "2025-03-12", categoria: "Propuesta" });
+            const temaCC = crearTema("Cambio Climático");
+            const fuenteCC = guardarFuente(temaCC, null, { titulo: "IPCC AR6", url: "https://www.ipcc.ch/report/ar6/", fechaConsulta: "2021", tipo: "Reporte", autores: "IPCC" });
+            guardarNota(fuenteCC, null, { ubicacion: "Resumen técnico, p. 45", texto: "La temperatura global ha aumentado 1.1°C.", fecha: "2025-03-02", categoria: "Dato" });
+        }
+        renderizarTodo();
+
+        // Eventos UI
+        document.getElementById('btnCrearTema').addEventListener('click', () => { const nombre = document.getElementById('nuevoTemaNombre').value; if(crearTema(nombre)) { document.getElementById('nuevoTemaNombre').value = ''; renderizarTodo(); } });
+        document.getElementById('btnExportarDB').addEventListener('click', exportarDB);
+        document.getElementById('btnImportarReemplazar').addEventListener('click', () => document.getElementById('importDBReemplazar').click());
+        document.getElementById('btnImportarCombinar').addEventListener('click', () => document.getElementById('importDBCombinar').click());
+        document.getElementById('importDBReemplazar').addEventListener('change', e => { if(e.target.files.length) importarDBReemplazar(e.target.files[0]); e.target.value = ''; });
+        document.getElementById('importDBCombinar').addEventListener('change', e => { if(e.target.files.length) importarDBCombinar(e.target.files[0]); e.target.value = ''; });
+        document.getElementById('btnGenerarPDFGlobal').addEventListener('click', generarPDFGlobal);
+        document.getElementById('btnMarkdownGlobal').addEventListener('click', () => {
+            let mdGlobal = '';
+            const temas = listarTemas();
+            for (let t of temas) mdGlobal += generarMarkdownTema(t.id);
+            abrirEditorMarkdown(mdGlobal, `reporte_global_${new Date().toISOString().slice(0,19)}.md`);
+        });
+        document.getElementById('btnGuardarFuente').addEventListener('click', guardarFuenteModal);
+        document.getElementById('btnCancelarFuente').addEventListener('click', cerrarModalFuente);
+        document.getElementById('btnGuardarNota').addEventListener('click', guardarNotaModal);
+        document.getElementById('btnCancelarNota').addEventListener('click', cerrarModalNota);
+        document.getElementById('btnBuscar').addEventListener('click', () => buscarGlobal(document.getElementById('buscarInput').value));
+        document.getElementById('btnLimpiarBusqueda').addEventListener('click', () => document.getElementById('buscarInput').value = '');
+        document.getElementById('btnCerrarResultados').addEventListener('click', () => document.getElementById('modalResultados').style.display = 'none');
+        document.getElementById('btnCerrarMatriz').addEventListener('click', () => document.getElementById('modalMatriz').style.display = 'none');
+        document.getElementById('btnExportarMatrizCSV').addEventListener('click', exportarMatrizCSV);
+        document.getElementById('btnCopiarCita').addEventListener('click', copiarCita);
+        document.getElementById('btnCerrarCita').addEventListener('click', () => document.getElementById('modalCita').style.display = 'none');
+        document.getElementById('btnCopiarMarkdown').addEventListener('click', copiarMarkdown);
+        document.getElementById('btnDescargarMarkdown').addEventListener('click', descargarMarkdownDesdeEditor);
+        document.getElementById('btnCerrarMarkdown').addEventListener('click', () => document.getElementById('modalMarkdown').style.display = 'none');
+        document.getElementById('editorMarkdown').addEventListener('input', actualizarVistaPrevia);
+        configurarBarraHerramientas();
+        window.addEventListener('click', e => {
+            if(e.target === document.getElementById('modalResultados')) document.getElementById('modalResultados').style.display = 'none';
+            if(e.target === document.getElementById('modalFuente')) cerrarModalFuente();
+            if(e.target === document.getElementById('modalNota')) cerrarModalNota();
+            if(e.target === document.getElementById('modalMatriz')) document.getElementById('modalMatriz').style.display = 'none';
+            if(e.target === document.getElementById('modalCita')) document.getElementById('modalCita').style.display = 'none';
+            if(e.target === document.getElementById('modalMarkdown')) document.getElementById('modalMarkdown').style.display = 'none';
+        });
+    });
+</script>
+</body>
+</html>

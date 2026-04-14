@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Investigador PRO</title>
+    <title>Investigador PRO | Backup en Drive + Matriz + Tarjetas</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, 'Segoe UI', 'Inter', sans-serif; }
         body { background: #f0f4f8; padding: 2rem 1.5rem; }
@@ -61,7 +62,6 @@
         textarea { width: 100%; padding: 0.8rem; border: 1px solid #cbdde6; border-radius: 1rem; font-family: monospace; font-size: 0.85rem; }
         .vista-previa { background: #fefaf5; border: 1px solid #cbdde6; border-radius: 1rem; padding: 1rem; overflow-y: auto; max-height: 550px; }
         .categoria-input { width: 100%; border-radius: 1rem; padding: 0.3rem; border: 1px solid #cbdde6; }
-        /* Estilos para vista de tarjetas */
         .tarjetas-container { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
         .tarjeta-nota { background: white; border-radius: 1.2rem; border: 1px solid #e2dcd5; padding: 1rem; width: calc(33% - 1rem); min-width: 280px; flex: 1 1 auto; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.1s; }
         .tarjeta-nota:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
@@ -78,7 +78,7 @@
 <div class="container">
     <div class="header-busqueda">
         <div class="busqueda-input">
-            <label>🔍 Buscar</label>
+            <label>🔍 Buscar (SQL LIKE)</label>
             <input type="text" id="buscarInput" placeholder="Palabra o frase...">
         </div>
         <button id="btnBuscar">Buscar</button>
@@ -96,6 +96,7 @@
                 <div id="temasLista" class="temas-lista"></div>
                 <div class="toolbar" style="margin-top: 1rem;">
                     <button id="btnExportarDB" class="btn-sec">📤 Exportar DB (.db)</button>
+                    <button id="btnGuardarDrive" class="btn-sec" style="background:#4285F4;">☁️ Guardar en Drive</button>
                     <button id="btnImportarReemplazar" class="btn-sec">📥 Importar DB (reemplazar)</button>
                     <button id="btnImportarCombinar" class="btn-sec">➕ Añadir DB (combinar)</button>
                     <button id="btnGenerarPDFGlobal" class="btn-sec">📄 PDF Global</button>
@@ -114,30 +115,21 @@
     </div>
 </div>
 
-<!-- Modales (incluyendo categorías predefinidas) -->
+<!-- Modales -->
 <div id="modalResultados" class="modal"><div class="modal-contenido"><h3>🔍 Resultados de búsqueda</h3><div id="resultadosLista"></div><div class="botones-modal"><button id="btnCerrarResultados" class="btn-sec">Cerrar</button></div></div></div>
 <div id="modalFuente" class="modal"><div class="modal-contenido"><h3 id="modalFuenteTitulo">➕ Fuente</h3><div class="campo"><label>Título</label><input type="text" id="fuenteTitulo"></div><div class="campo"><label>URL / DOI</label><input type="url" id="fuenteUrl"></div><div class="campo"><label>Fecha consulta (año)</label><input type="text" id="fuenteFecha" placeholder="Ej: 2023"></div><div class="campo"><label>Tipo</label><input type="text" id="fuenteTipo" placeholder="Artículo, libro..."></div><div class="campo"><label>Autores</label><input type="text" id="fuenteAutores" placeholder="Apellido, N.; Apellido2, N."></div><div class="botones-modal"><button id="btnGuardarFuente">Guardar</button><button id="btnCancelarFuente" class="btn-sec">Cancelar</button></div></div></div>
 <div id="modalNota" class="modal"><div class="modal-contenido"><h3 id="modalNotaTitulo">📝 Nota de lectura</h3><div class="campo"><label>📍 Ubicación</label><input type="text" id="notaUbicacion"></div><div class="campo"><label>📄 Nota</label><textarea id="notaTexto" rows="4"></textarea></div><div class="campo"><label>📅 Fecha</label><input type="date" id="notaFecha"></div>
     <div class="campo"><label>🏷️ Categoría</label>
         <input list="categoriasPredefinidas" id="notaCategoria" placeholder="Selecciona o escribe una categoría">
         <datalist id="categoriasPredefinidas">
-            <option>Hallazgo</option>
-            <option>Debilidad</option>
-            <option>Propuesta</option>
-            <option>Oportunidad</option>
-            <option>Dato</option>
-            <option>Cita textual</option>
-            <option>Riesgo</option>
-            <option>Conclusión</option>
-            <option>Otro</option>
+            <option>Hallazgo</option><option>Debilidad</option><option>Propuesta</option><option>Oportunidad</option>
+            <option>Dato</option><option>Cita textual</option><option>Riesgo</option><option>Conclusión</option><option>Otro</option>
         </datalist>
     </div>
     <div class="botones-modal"><button id="btnGuardarNota">Guardar</button><button id="btnCancelarNota" class="btn-sec">Cancelar</button></div>
 </div></div>
 <div id="modalMatriz" class="modal"><div class="modal-contenido"><h3 id="matrizTitulo">📊 Matriz de datos</h3><div id="matrizContenido"></div><div class="botones-modal"><button id="btnExportarMatrizCSV" class="btn-sec">📎 Exportar a CSV</button><button id="btnCerrarMatriz" class="btn-sec">Cerrar</button></div></div></div>
 <div id="modalCita" class="modal"><div class="modal-contenido"><h3>📝 Cita APA (7ª edición)</h3><div id="citaTexto" class="cita-texto"></div><div class="botones-modal"><button id="btnCopiarCita" class="btn-copiar">📋 Copiar cita</button><button id="btnCerrarCita" class="btn-sec">Cerrar</button></div></div></div>
-
-<!-- Modal editor Markdown -->
 <div id="modalMarkdown" class="modal">
     <div class="modal-contenido" style="max-width: 1400px;">
         <h3>✏️ Editor Markdown</h3>
@@ -164,6 +156,12 @@
 </div>
 
 <script>
+    // ---------- CONFIGURACIÓN DE GOOGLE DRIVE ----------
+    const CLIENT_ID = '197758625418-vc2r4kgtg7oa7ll5cni3hbhfmthonvef.apps.googleusercontent.com';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+    let tokenClient;
+    let accessToken = null;
+
     // ---------- GLOBALES ----------
     let SQL = null;
     let db = null;
@@ -174,7 +172,7 @@
     let matrizFuenteActual = null;
     let currentMarkdownContent = '';
     let currentMarkdownFilename = 'reporte.md';
-    let vistaActual = 'tabla'; // 'tabla' o 'tarjetas'
+    let vistaActual = 'tabla';
 
     // ---------- INICIALIZAR SQLITE ----------
     async function initDatabase() {
@@ -197,7 +195,7 @@
     function generarId() { return Date.now() + '-' + Math.random().toString(36).substring(2,8); }
     function escapeHtml(s) { return s.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
 
-    // ---------- CRUD ----------
+    // ---------- CRUD TEMAS ----------
     function listarTemas() { if (!db) return []; const stmt = db.prepare("SELECT id, nombre FROM temas ORDER BY nombre"); const temas = []; while (stmt.step()) temas.push(stmt.getAsObject()); stmt.free(); return temas; }
     function crearTema(nombre) { if (!nombre.trim()) return null; const id = generarId(); db.run("INSERT INTO temas (id, nombre) VALUES (?, ?)", [id, nombre.trim()]); return id; }
     function eliminarTema(temaId) { db.run("DELETE FROM notas WHERE fuente_id IN (SELECT id FROM fuentes WHERE tema_id = ?)", [temaId]); db.run("DELETE FROM fuentes WHERE tema_id = ?", [temaId]); db.run("DELETE FROM temas WHERE id = ?", [temaId]); }
@@ -218,7 +216,7 @@
     function mostrarCitaAPA(fuenteId) { const fuente = obtenerFuente(fuenteId); if (!fuente) return; const cita = generarCitaAPA(fuente); document.getElementById('citaTexto').innerHTML = escapeHtml(cita); document.getElementById('modalCita').style.display = 'flex'; window.citaPlana = cita; }
     function copiarCita() { if(window.citaPlana) { navigator.clipboard.writeText(window.citaPlana); alert('Cita copiada'); } }
 
-    // ---------- MATRIZ DE HALLAZGOS CON FILTROS Y VISTA TARJETAS ----------
+    // ---------- MATRIZ DE HALLAZGOS (con filtros y tarjetas) ----------
     function mostrarMatrizHallazgos(temaId) {
         const tema = listarTemas().find(t => t.id === temaId);
         if (!tema) return;
@@ -228,22 +226,12 @@
             const notas = listarNotas(f.id);
             for (let n of notas) {
                 todasNotas.push({
-                    id: n.id,
-                    fuente: f.titulo,
-                    autores: f.autores || '',
-                    anio: f.fecha_consulta || '',
-                    ubicacion: n.ubicacion || '—',
-                    texto: n.texto,
-                    categoria: n.categoria || '',
-                    fuenteId: f.id
+                    id: n.id, fuente: f.titulo, autores: f.autores || '', anio: f.fecha_consulta || '',
+                    ubicacion: n.ubicacion || '—', texto: n.texto, categoria: n.categoria || '', fuenteId: f.id
                 });
             }
         }
-        // Construir modal con filtro y selector de vista
-        const modalDiv = document.createElement('div');
-        modalDiv.id = 'modalMatrizHallazgos';
-        modalDiv.className = 'modal';
-        modalDiv.style.display = 'flex';
+        const modalDiv = document.createElement('div'); modalDiv.id = 'modalMatrizHallazgos'; modalDiv.className = 'modal'; modalDiv.style.display = 'flex';
         modalDiv.innerHTML = `
             <div class="modal-contenido" style="max-width:1200px;">
                 <h3>📊 Matriz de hallazgos - ${escapeHtml(tema.nombre)}</h3>
@@ -256,15 +244,12 @@
                         </select>
                     </div>
                     <div><label>📄 Vista:</label>
-                        <button id="vistaTablaBtn" class="btn-sec ${vistaActual === 'tabla' ? 'active' : ''}" style="background:${vistaActual === 'tabla' ? '#2c7da0' : '#5f7f8c'};">📋 Tabla</button>
-                        <button id="vistaTarjetasBtn" class="btn-sec ${vistaActual === 'tarjetas' ? 'active' : ''}" style="background:${vistaActual === 'tarjetas' ? '#2c7da0' : '#5f7f8c'};">🃏 Tarjetas</button>
+                        <button id="vistaTablaBtn" class="btn-sec" style="background:${vistaActual === 'tabla' ? '#2c7da0' : '#5f7f8c'};">📋 Tabla</button>
+                        <button id="vistaTarjetasBtn" class="btn-sec" style="background:${vistaActual === 'tarjetas' ? '#2c7da0' : '#5f7f8c'};">🃏 Tarjetas</button>
                     </div>
                 </div>
                 <div id="contenedorMatrizHallazgos"></div>
-                <div class="botones-modal">
-                    <button id="exportarMatrizHallazgosCSV" class="btn-sec">📎 Exportar CSV</button>
-                    <button id="cerrarMatrizHallazgos" class="btn-sec">Cerrar</button>
-                </div>
+                <div class="botones-modal"><button id="exportarMatrizHallazgosCSV" class="btn-sec">📎 Exportar CSV</button><button id="cerrarMatrizHallazgos" class="btn-sec">Cerrar</button></div>
             </div>
         `;
         document.body.appendChild(modalDiv);
@@ -278,31 +263,23 @@
             let notasFiltradas = todasNotas;
             if (filtro === 'SIN_CATEGORIA') notasFiltradas = todasNotas.filter(n => !n.categoria);
             else if (filtro !== 'TODAS') notasFiltradas = todasNotas.filter(n => n.categoria === filtro);
-            if (vistaActual === 'tabla') {
-                renderTabla(notasFiltradas);
-            } else {
-                renderTarjetas(notasFiltradas);
-            }
+            if (vistaActual === 'tabla') renderTabla(notasFiltradas);
+            else renderTarjetas(notasFiltradas);
         }
 
         function renderTabla(notas) {
-            let html = `<table class="matriz-tabla" id="matrizHallazgosTabla">
-                            <thead><tr><th>Fuente</th><th>Autores/Año</th><th>Ubicación</th><th>Hallazgo / Nota</th><th>Categoría</th><th>Acción</th></tr></thead>
-                            <tbody>`;
+            let html = `<table class="matriz-tabla" id="matrizHallazgosTabla"><thead><tr><th>Fuente</th><th>Autores/Año</th><th>Ubicación</th><th>Hallazgo / Nota</th><th>Categoría</th><th>Acción</th></tr></thead><tbody>`;
             for (let n of notas) {
                 html += `<tr data-nota-id="${n.id}">
-                            <td>${escapeHtml(n.fuente)}</td>
-                            <td>${escapeHtml(n.autores)} ${n.anio ? `(${n.anio})` : ''}</td>
-                            <td>${escapeHtml(n.ubicacion)}</td>
-                            <td>${escapeHtml(n.texto)}</td>
+                            <td>${escapeHtml(n.fuente)}</td><td>${escapeHtml(n.autores)} ${n.anio ? `(${n.anio})` : ''}</td>
+                            <td>${escapeHtml(n.ubicacion)}</td><td>${escapeHtml(n.texto)}</td>
                             <td><input type="text" class="categoria-input" data-id="${n.id}" value="${escapeHtml(n.categoria)}" list="categoriasList" style="width:100%;"><datalist id="categoriasList">${Array.from(new Set(todasNotas.map(nn => nn.categoria))).filter(c=>c).map(c=>`<option>${c}</option>`).join('')}</datalist></td>
                             <td><button class="guardar-categoria" data-id="${n.id}">💾 Guardar</button></td>
-                         </tr>`;
+                          </tr>`;
             }
-            if (notas.length === 0) html += '<tr><td colspan="6">No hay notas con este filtro.</td></tr>';
+            if (notas.length === 0) html += '<tr><td colspan="6">No hay notas con este filtro.</tr>';
             html += `</tbody></table>`;
             contenedor.innerHTML = html;
-            // Eventos guardar categoría
             document.querySelectorAll('.guardar-categoria').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const notaId = btn.getAttribute('data-id');
@@ -310,7 +287,6 @@
                     const nuevaCategoria = input.value.trim();
                     db.run("UPDATE notas SET categoria = ? WHERE id = ?", [nuevaCategoria, notaId]);
                     alert('Categoría guardada');
-                    // Recargar matriz para actualizar opciones de filtro
                     mostrarMatrizHallazgos(temaId);
                 });
             });
@@ -336,7 +312,6 @@
             if (notas.length === 0) html += '<p>No hay notas con este filtro.</p>';
             html += `</div>`;
             contenedor.innerHTML = html;
-            // Eventos para guardar categoría desde tarjeta
             document.querySelectorAll('.guardar-categoria-tarjeta').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const notaId = btn.getAttribute('data-id');
@@ -353,7 +328,6 @@
         vistaTablaBtn.addEventListener('click', () => { vistaActual = 'tabla'; actualizarVista(); });
         vistaTarjetasBtn.addEventListener('click', () => { vistaActual = 'tarjetas'; actualizarVista(); });
         actualizarVista();
-
         document.getElementById('exportarMatrizHallazgosCSV')?.addEventListener('click', () => exportarMatrizHallazgosCSV(tema.nombre, filtroSelect.value));
         document.getElementById('cerrarMatrizHallazgos')?.addEventListener('click', () => modalDiv.remove());
     }
@@ -365,25 +339,21 @@
         let csv = [['Fuente','Autores/Año','Ubicación','Hallazgo','Categoría'].join(',')];
         filas.forEach(row => {
             const celdas = row.querySelectorAll('td');
-            if (celdas.length >= 5 && row.cells) {
-                const fuente = row.cells[0].innerText.replace(/,/g, ';');
-                const autores = row.cells[1].innerText.replace(/,/g, ';');
-                const ubicacion = row.cells[2].innerText.replace(/,/g, ';');
-                const hallazgo = row.cells[3].innerText.replace(/,/g, ';');
-                const categoriaInput = row.cells[4].querySelector('input');
+            if (celdas.length >= 5) {
+                const fuente = celdas[0].innerText.replace(/,/g, ';');
+                const autores = celdas[1].innerText.replace(/,/g, ';');
+                const ubicacion = celdas[2].innerText.replace(/,/g, ';');
+                const hallazgo = celdas[3].innerText.replace(/,/g, ';');
+                const categoriaInput = celdas[4].querySelector('input');
                 const categoria = categoriaInput ? categoriaInput.value.replace(/,/g, ';') : '';
                 csv.push([fuente, autores, ubicacion, hallazgo, categoria].join(','));
             }
         });
         const blob = new Blob([csv.join('\n')], {type: 'text/csv'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `matriz_hallazgos_${temaNombre.replace(/\s/g, '_')}.csv`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `matriz_hallazgos_${temaNombre.replace(/\s/g, '_')}.csv`; a.click(); URL.revokeObjectURL(a.href);
     }
 
-    // ---------- RENDERIZADO PRINCIPAL (similar al anterior, pero con matriz mejorada) ----------
+    // ---------- RENDERIZADO PRINCIPAL ----------
     function renderizarTemas() {
         const container = document.getElementById('temasLista');
         const temas = listarTemas();
@@ -628,8 +598,39 @@
         document.getElementById('modalResultados').style.display = 'flex';
     }
 
-    // ---------- IMPORTACIÓN/EXPORTACIÓN DB ----------
+    // ---------- IMPORTACIÓN/EXPORTACIÓN DB Y DRIVE ----------
     function exportarDB() { const data = db.export(); const blob = new Blob([data], {type: 'application/octet-stream'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `investigacion_${new Date().toISOString().slice(0,19)}.db`; a.click(); URL.revokeObjectURL(url); }
+
+    function exportarDBaBlob() { return new Blob([db.export()], { type: 'application/octet-stream' }); }
+
+    function subirDBaDrive() {
+        if (!accessToken) {
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+            return;
+        }
+        const blob = exportarDBaBlob();
+        const metadata = { name: `investigacion_${new Date().toISOString().slice(0,19)}.db`, mimeType: 'application/octet-stream' };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', blob);
+        fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST', headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }), body: form
+        }).then(response => response.json()).then(data => {
+            if (data.id) alert('✅ Archivo guardado en Google Drive. ID: ' + data.id);
+            else alert('❌ Error al guardar: ' + JSON.stringify(data));
+        }).catch(error => alert('❌ Error de conexión: ' + error));
+    }
+
+    function guardarEnDrive() {
+        if (!tokenClient) { alert('Inicializando conexión con Google Drive...'); return; }
+        if (!accessToken) subirDBaDrive();
+        else subirDBaDrive();
+    }
+
+    function inicializarGoogleDrive() {
+        tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPES, callback: (tokenResponse) => { accessToken = tokenResponse.access_token; subirDBaDrive(); } });
+    }
+
     function importarDBReemplazar(file) { if (!SQL) { alert("La librería SQL no está lista."); return; } if (!confirm('⚠️ Esta acción reemplazará TODOS los datos actuales por los del archivo. ¿Continuar?')) return; const reader = new FileReader(); reader.onload = e => { try { const array = new Uint8Array(e.target.result); if (db) db.close(); db = new SQL.Database(array); dbInitialized = true; temaActivoId = null; renderizarTodo(); alert('Base de datos reemplazada correctamente.'); } catch (err) { alert('Error al importar: ' + err.message); } }; reader.readAsArrayBuffer(file); }
     function importarDBCombinar(file) { if (!SQL) { alert("La librería SQL no está lista."); return; } const reader = new FileReader(); reader.onload = e => { try { const array = new Uint8Array(e.target.result); const newDb = new SQL.Database(array); const tablas = ['temas', 'fuentes', 'notas']; for (let tabla of tablas) { const stmt = newDb.prepare(`SELECT * FROM ${tabla}`); const columnNames = stmt.getColumnNames(); const insertStmt = db.prepare(`INSERT OR IGNORE INTO ${tabla} (${columnNames.join(',')}) VALUES (${columnNames.map(() => '?').join(',')})`); while (stmt.step()) { const row = stmt.get(); insertStmt.run(row); } insertStmt.free(); stmt.free(); } newDb.close(); renderizarTodo(); alert('Datos combinados correctamente (se añadieron nuevos registros sin duplicados).'); } catch (err) { alert('Error al combinar: ' + err.message); } }; reader.readAsArrayBuffer(file); }
 
@@ -716,57 +717,26 @@
 
     function configurarBarraHerramientas() {
         const acciones = {
-            bold: { pre: '**', suf: '**', def: 'texto en negrita' },
-            italic: { pre: '*', suf: '*', def: 'texto en cursiva' },
-            heading: { pre: '# ', suf: '', def: 'Título' },
-            'list-ul': { pre: '- ', suf: '', def: 'Elemento de lista' },
-            'list-ol': { pre: '1. ', suf: '', def: 'Elemento numerado' },
-            link: { pre: '[', suf: '](url)', def: 'texto del enlace' },
+            bold: { pre: '**', suf: '**', def: 'texto en negrita' }, italic: { pre: '*', suf: '*', def: 'texto en cursiva' },
+            heading: { pre: '# ', suf: '', def: 'Título' }, 'list-ul': { pre: '- ', suf: '', def: 'Elemento de lista' },
+            'list-ol': { pre: '1. ', suf: '', def: 'Elemento numerado' }, link: { pre: '[', suf: '](url)', def: 'texto del enlace' },
             image: { pre: '![', suf: '](url-imagen)', def: 'texto alternativo' },
             table: { pre: '\n| Cabecera 1 | Cabecera 2 |\n|------------|------------|\n| Celda 1    | Celda 2    |\n', suf: '', def: '' },
-            code: { pre: '`', suf: '`', def: 'código' },
-            codeblock: { pre: '```\n', suf: '\n```', def: 'código' },
-            quote: { pre: '> ', suf: '', def: 'cita' },
-            separator: { pre: '\n---\n', suf: '', def: '' }
+            code: { pre: '`', suf: '`', def: 'código' }, codeblock: { pre: '```\n', suf: '\n```', def: 'código' },
+            quote: { pre: '> ', suf: '', def: 'cita' }, separator: { pre: '\n---\n', suf: '', def: '' }
         };
         document.querySelectorAll('[data-md]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const action = btn.getAttribute('data-md');
-                if (acciones[action]) insertarMarkdown(acciones[action].pre, acciones[action].suf, acciones[action].def);
-            });
+            btn.addEventListener('click', () => { const action = btn.getAttribute('data-md'); if (acciones[action]) insertarMarkdown(acciones[action].pre, acciones[action].suf, acciones[action].def); });
         });
     }
 
     function abrirEditorMarkdown(contenidoInicial, nombreArchivo) {
-        currentMarkdownContent = contenidoInicial;
-        currentMarkdownFilename = nombreArchivo.endsWith('.md') ? nombreArchivo : nombreArchivo + '.md';
-        const editor = document.getElementById('editorMarkdown');
-        editor.value = contenidoInicial;
-        actualizarVistaPrevia();
-        document.getElementById('modalMarkdown').style.display = 'flex';
+        currentMarkdownContent = contenidoInicial; currentMarkdownFilename = nombreArchivo.endsWith('.md') ? nombreArchivo : nombreArchivo + '.md';
+        document.getElementById('editorMarkdown').value = contenidoInicial; actualizarVistaPrevia(); document.getElementById('modalMarkdown').style.display = 'flex';
     }
-
-    function actualizarVistaPrevia() {
-        const md = document.getElementById('editorMarkdown').value;
-        const html = marked.parse(md);
-        document.getElementById('vistaPreviaMarkdown').innerHTML = html;
-    }
-
-    function descargarMarkdownDesdeEditor() {
-        const contenido = document.getElementById('editorMarkdown').value;
-        const blob = new Blob([contenido], {type: 'text/markdown'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = currentMarkdownFilename;
-        a.click();
-        URL.revokeObjectURL(url);
-    }
-
-    function copiarMarkdown() {
-        const contenido = document.getElementById('editorMarkdown').value;
-        navigator.clipboard.writeText(contenido).then(() => alert('Markdown copiado al portapapeles'));
-    }
+    function actualizarVistaPrevia() { const md = document.getElementById('editorMarkdown').value; document.getElementById('vistaPreviaMarkdown').innerHTML = marked.parse(md); }
+    function descargarMarkdownDesdeEditor() { const contenido = document.getElementById('editorMarkdown').value; const blob = new Blob([contenido], {type: 'text/markdown'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = currentMarkdownFilename; a.click(); URL.revokeObjectURL(url); }
+    function copiarMarkdown() { const contenido = document.getElementById('editorMarkdown').value; navigator.clipboard.writeText(contenido).then(() => alert('Markdown copiado al portapapeles')); }
 
     // ---------- INICIALIZACIÓN ----------
     window.addEventListener('DOMContentLoaded', async () => {
@@ -781,21 +751,18 @@
             guardarNota(fuenteCC, null, { ubicacion: "Resumen técnico, p. 45", texto: "La temperatura global ha aumentado 1.1°C.", fecha: "2025-03-02", categoria: "Dato" });
         }
         renderizarTodo();
+        inicializarGoogleDrive();
 
         // Eventos UI
         document.getElementById('btnCrearTema').addEventListener('click', () => { const nombre = document.getElementById('nuevoTemaNombre').value; if(crearTema(nombre)) { document.getElementById('nuevoTemaNombre').value = ''; renderizarTodo(); } });
         document.getElementById('btnExportarDB').addEventListener('click', exportarDB);
+        document.getElementById('btnGuardarDrive').addEventListener('click', guardarEnDrive);
         document.getElementById('btnImportarReemplazar').addEventListener('click', () => document.getElementById('importDBReemplazar').click());
         document.getElementById('btnImportarCombinar').addEventListener('click', () => document.getElementById('importDBCombinar').click());
         document.getElementById('importDBReemplazar').addEventListener('change', e => { if(e.target.files.length) importarDBReemplazar(e.target.files[0]); e.target.value = ''; });
         document.getElementById('importDBCombinar').addEventListener('change', e => { if(e.target.files.length) importarDBCombinar(e.target.files[0]); e.target.value = ''; });
         document.getElementById('btnGenerarPDFGlobal').addEventListener('click', generarPDFGlobal);
-        document.getElementById('btnMarkdownGlobal').addEventListener('click', () => {
-            let mdGlobal = '';
-            const temas = listarTemas();
-            for (let t of temas) mdGlobal += generarMarkdownTema(t.id);
-            abrirEditorMarkdown(mdGlobal, `reporte_global_${new Date().toISOString().slice(0,19)}.md`);
-        });
+        document.getElementById('btnMarkdownGlobal').addEventListener('click', () => { let mdGlobal = ''; const temas = listarTemas(); for (let t of temas) mdGlobal += generarMarkdownTema(t.id); abrirEditorMarkdown(mdGlobal, `reporte_global_${new Date().toISOString().slice(0,19)}.md`); });
         document.getElementById('btnGuardarFuente').addEventListener('click', guardarFuenteModal);
         document.getElementById('btnCancelarFuente').addEventListener('click', cerrarModalFuente);
         document.getElementById('btnGuardarNota').addEventListener('click', guardarNotaModal);

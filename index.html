@@ -8,7 +8,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- Google Identity Services (para Drive) -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, 'Segoe UI', 'Inter', sans-serif; }
@@ -45,7 +44,7 @@
         .nota-ref { font-weight: 600; color: #2c7da0; font-size: 0.7rem; }
         .badge { background: #e2eaf1; padding: 0.2rem 0.6rem; border-radius: 30px; font-size: 0.7rem; }
         .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); backdrop-filter: blur(3px); align-items:center; justify-content:center; z-index:1000; }
-        .modal-contenido { background: white; padding: 2rem; border-radius: 2rem; width: 90%; max-width: 1400px; max-height: 85vh; overflow-y: auto; animation: fadeUp 0.2s; }
+        .modal-contenido { background: white; padding: 2rem; border-radius: 2rem; width: 90%; max-width: 800px; max-height: 85vh; overflow-y: auto; animation: fadeUp 0.2s; }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .botones-modal { display: flex; justify-content: flex-end; gap: 12px; margin-top: 1.5rem; }
         .resultado-item { padding: 0.8rem; border-bottom: 1px solid #e2e8f0; cursor: pointer; }
@@ -71,7 +70,13 @@
         .tarjeta-ubicacion { font-size: 0.75rem; color: #9b6a3c; margin-top: 0.3rem; }
         .tarjeta-texto { margin: 0.5rem 0; font-size: 0.9rem; }
         .tarjeta-categoria { margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-        .vista-toggle { margin-left: 1rem; }
+        .tool-group { margin-bottom: 1rem; border: 1px solid #e2e8f0; border-radius: 1rem; background: #fefaf5; }
+        .tool-group summary { padding: 0.6rem 1rem; font-weight: 600; cursor: pointer; background: #f8fafc; border-radius: 1rem; color: #1e4a62; user-select: none; }
+        .tool-group summary:hover { background: #eef3f7; }
+        .tool-group .group-buttons { padding: 0.8rem; display: flex; flex-wrap: wrap; gap: 8px; }
+        .notas-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 0.5rem; }
+        .import-json-example { font-size: 0.7rem; color: #5f7f8c; margin-left: 0.5rem; }
+        pre { background: #f1f5f9; padding: 0.5rem; border-radius: 0.8rem; overflow-x: auto; font-size: 0.75rem; }
         @media (max-width: 800px) { .two-columns { flex-direction: column; } body { padding: 1rem; } .tarjeta-nota { width: 100%; } }
     </style>
 </head>
@@ -95,16 +100,50 @@
                     <button id="btnCrearTema">➕ Crear</button>
                 </div>
                 <div id="temasLista" class="temas-lista"></div>
-                <div class="toolbar" style="margin-top: 1rem;">
-                    <button id="btnExportarDB" class="btn-sec">📤 Exportar DB (.db)</button>
-                    <button id="btnImportarReemplazar" class="btn-sec">📥 Importar DB (reemplazar)</button>
-                    <button id="btnImportarCombinar" class="btn-sec">➕ Añadir DB (combinar)</button>
-                    <button id="btnGuardarDrive" class="btn-sec">☁️ Guardar en Google Drive</button>
-                    <button id="btnGenerarPDFGlobal" class="btn-sec">📄 PDF Global</button>
-                    <button id="btnMarkdownGlobal" class="btn-sec">📝 Reporte Global MD</button>
-                    <input type="file" id="importDBReemplazar" accept=".db" style="display:none;">
-                    <input type="file" id="importDBCombinar" accept=".db" style="display:none;">
+                <div class="toolbar" style="margin-top: 1rem; flex-direction: column; align-items: stretch;">
+                    <details class="tool-group" open>
+                        <summary>💾 Sesión local</summary>
+                        <div class="group-buttons">
+                            <button id="btnGuardarSesion" class="btn-sec">Guardar sesión</button>
+                            <button id="btnCargarSesion" class="btn-sec">Cargar sesión</button>
+                            <button id="btnBorrarSesion" class="btn-sec">Borrar sesión</button>
+                        </div>
+                    </details>
+                    <details class="tool-group">
+                        <summary>🗄️ Base de datos (.db)</summary>
+                        <div class="group-buttons">
+                            <button id="btnExportarDB" class="btn-sec">Exportar DB</button>
+                            <button id="btnImportarReemplazar" class="btn-sec">Importar DB (reemplazar)</button>
+                            <button id="btnImportarCombinar" class="btn-sec">Añadir DB (combinar)</button>
+                        </div>
+                    </details>
+                    <details class="tool-group">
+                        <summary>📄 JSON (compatible)</summary>
+                        <div class="group-buttons">
+                            <button id="btnExportarTodoJSON" class="btn-sec">Exportar todo JSON</button>
+                            <button id="btnExportarTemaJSON" class="btn-sec">Exportar tema actual JSON</button>
+                            <button id="btnImportarJSONAdd" class="btn-sec">Importar JSON (añadir)</button>
+                            <button id="btnReemplazarTodoJSON" class="btn-sec">Reemplazar todo con JSON</button>
+                        </div>
+                    </details>
+                    <details class="tool-group">
+                        <summary>☁️ Nube / Google Drive</summary>
+                        <div class="group-buttons">
+                            <button id="btnGuardarDrive" class="btn-sec">Guardar en Google Drive</button>
+                        </div>
+                    </details>
+                    <details class="tool-group">
+                        <summary>📊 Reportes globales</summary>
+                        <div class="group-buttons">
+                            <button id="btnGenerarPDFGlobal" class="btn-sec">PDF Global</button>
+                            <button id="btnMarkdownGlobal" class="btn-sec">Reporte Global MD</button>
+                        </div>
+                    </details>
                 </div>
+                <input type="file" id="importDBReemplazar" accept=".db" style="display:none;">
+                <input type="file" id="importDBCombinar" accept=".db" style="display:none;">
+                <input type="file" id="importJSONAdd" accept=".json" style="display:none;">
+                <input type="file" id="importJSONReplace" accept=".json" style="display:none;">
             </div>
         </div>
         <div class="col-detalle">
@@ -116,7 +155,7 @@
     </div>
 </div>
 
-<!-- Modales -->
+<!-- Modales existentes -->
 <div id="modalResultados" class="modal"><div class="modal-contenido"><h3>🔍 Resultados de búsqueda</h3><div id="resultadosLista"></div><div class="botones-modal"><button id="btnCerrarResultados" class="btn-sec">Cerrar</button></div></div></div>
 <div id="modalFuente" class="modal"><div class="modal-contenido"><h3 id="modalFuenteTitulo">➕ Fuente</h3><div class="campo"><label>Título</label><input type="text" id="fuenteTitulo"></div><div class="campo"><label>URL / DOI</label><input type="url" id="fuenteUrl"></div><div class="campo"><label>Fecha consulta (año)</label><input type="text" id="fuenteFecha" placeholder="Ej: 2023"></div><div class="campo"><label>Tipo</label><input type="text" id="fuenteTipo" placeholder="Artículo, libro..."></div><div class="campo"><label>Autores</label><input type="text" id="fuenteAutores" placeholder="Apellido, N.; Apellido2, N."></div><div class="botones-modal"><button id="btnGuardarFuente">Guardar</button><button id="btnCancelarFuente" class="btn-sec">Cancelar</button></div></div></div>
 <div id="modalNota" class="modal"><div class="modal-contenido"><h3 id="modalNotaTitulo">📝 Nota de lectura</h3><div class="campo"><label>📍 Ubicación</label><input type="text" id="notaUbicacion"></div><div class="campo"><label>📄 Nota</label><textarea id="notaTexto" rows="4"></textarea></div><div class="campo"><label>📅 Fecha</label><input type="date" id="notaFecha"></div>
@@ -142,24 +181,52 @@
     <div class="modal-contenido" style="max-width: 1400px;">
         <h3>✏️ Editor Markdown</h3>
         <div class="markdown-toolbar">
-            <button type="button" data-md="bold" title="Negrita (Ctrl+B)">B</button>
-            <button type="button" data-md="italic" title="Cursiva (Ctrl+I)"><i>I</i></button>
-            <button type="button" data-md="heading" title="Título">H1</button>
-            <button type="button" data-md="list-ul" title="Lista desordenada">•</button>
-            <button type="button" data-md="list-ol" title="Lista ordenada">1.</button>
-            <button type="button" data-md="link" title="Enlace">🔗</button>
-            <button type="button" data-md="image" title="Imagen">🖼️</button>
-            <button type="button" data-md="table" title="Tabla">📊</button>
-            <button type="button" data-md="code" title="Código inline">{ }</button>
-            <button type="button" data-md="codeblock" title="Bloque de código">```</button>
-            <button type="button" data-md="quote" title="Cita">❝</button>
-            <button type="button" data-md="separator" title="Línea horizontal">---</button>
+            <button type="button" data-md="bold">B</button>
+            <button type="button" data-md="italic"><i>I</i></button>
+            <button type="button" data-md="heading">H1</button>
+            <button type="button" data-md="list-ul">•</button>
+            <button type="button" data-md="list-ol">1.</button>
+            <button type="button" data-md="link">🔗</button>
+            <button type="button" data-md="image">🖼️</button>
+            <button type="button" data-md="table">📊</button>
+            <button type="button" data-md="code">{ }</button>
+            <button type="button" data-md="codeblock">```</button>
+            <button type="button" data-md="quote">❝</button>
+            <button type="button" data-md="separator">---</button>
         </div>
         <div class="editor-markdown-container">
-            <div><label>📝 Código Markdown (editable)</label><textarea id="editorMarkdown" rows="20" style="font-family: monospace;"></textarea></div>
+            <div><label>📝 Código Markdown</label><textarea id="editorMarkdown" rows="20"></textarea></div>
             <div><label>👁️ Vista previa</label><div id="vistaPreviaMarkdown" class="vista-previa"></div></div>
         </div>
         <div class="botones-modal"><button id="btnCopiarMarkdown" class="btn-sec">📋 Copiar</button><button id="btnDescargarMarkdown" class="btn-sec">💾 Descargar .md</button><button id="btnCerrarMarkdown" class="btn-sec">Cerrar</button></div>
+    </div>
+</div>
+
+<!-- NUEVO MODAL PARA PEGAR JSON DE NOTAS -->
+<div id="modalImportarNotasJSON" class="modal">
+    <div class="modal-contenido">
+        <h3>📥 Importar notas desde JSON</h3>
+        <p>Pega aquí el array de objetos (cada objeto puede tener: <code>ubicacion</code>, <code>texto</code> (obligatorio), <code>categoria</code> y opcional <code>fecha</code>). La fecha se asignará automáticamente si no la incluyes.</p>
+        <div class="campo">
+            <label>📋 JSON:</label>
+            <textarea id="jsonNotasInput" rows="12" placeholder='Ejemplo:
+[
+  {
+    "ubicacion": "p. 23",
+    "texto": "La inteligencia artificial mejora la eficiencia",
+    "categoria": "Hallazgo"
+  },
+  {
+    "ubicacion": "cap. 4",
+    "texto": "Se necesita más regulación",
+    "categoria": "Propuesta"
+  }
+]'></textarea>
+        </div>
+        <div class="botones-modal">
+            <button id="btnConfirmarImportarNotasJSON" class="btn-sec">✅ Importar</button>
+            <button id="btnCancelarImportarNotasJSON" class="btn-sec">Cancelar</button>
+        </div>
     </div>
 </div>
 
@@ -174,7 +241,8 @@
     let matrizFuenteActual = null;
     let currentMarkdownContent = '';
     let currentMarkdownFilename = 'reporte.md';
-    let vistaActual = 'tabla'; // 'tabla' o 'tarjetas'
+    let vistaActual = 'tabla';
+    let pendingFuenteIdForJSON = null;  // para saber a qué fuente añadir las notas
 
     // ---------- Google Drive ----------
     const CLIENT_ID = '197758625418-vc2r4kgtg7oa7ll5cni3hbhfmthonvef.apps.googleusercontent.com';
@@ -189,7 +257,7 @@
             callback: (tokenResponse) => {
                 if (tokenResponse.access_token) {
                     accessToken = tokenResponse.access_token;
-                    uploadCurrentDB(); // subir después de autenticar
+                    uploadCurrentDB();
                 } else {
                     alert('No se pudo obtener acceso a Google Drive.');
                 }
@@ -199,7 +267,6 @@
 
     function saveToDrive() {
         if (!accessToken) {
-            // Solicitar autenticación
             tokenClient.requestAccessToken({ prompt: 'consent' });
         } else {
             uploadCurrentDB();
@@ -207,21 +274,14 @@
     }
 
     async function uploadCurrentDB() {
-        if (!accessToken) {
-            alert('No estás autenticado. Intenta de nuevo.');
-            return;
-        }
+        if (!accessToken) { alert('No autenticado'); return; }
         const dbData = db.export();
         const blob = new Blob([dbData], { type: 'application/octet-stream' });
         const fileName = `investigacion_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.db`;
-        const metadata = {
-            name: fileName,
-            mimeType: 'application/octet-stream'
-        };
+        const metadata = { name: fileName, mimeType: 'application/octet-stream' };
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
         form.append('file', blob);
-
         try {
             const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
                 method: 'POST',
@@ -229,16 +289,9 @@
                 body: form
             });
             const result = await response.json();
-            if (response.ok) {
-                alert(`✅ Archivo guardado en Google Drive: ${fileName}`);
-            } else {
-                console.error(result);
-                alert('Error al guardar en Drive: ' + (result.error?.message || 'Desconocido'));
-            }
-        } catch (err) {
-            console.error(err);
-            alert('Error de red o permisos.');
-        }
+            if (response.ok) alert(`✅ Archivo guardado en Drive: ${fileName}`);
+            else alert('Error: ' + (result.error?.message || ''));
+        } catch (err) { alert('Error de red'); }
     }
 
     // ---------- INICIALIZAR SQLITE ----------
@@ -276,6 +329,35 @@
     function guardarNota(fuenteId, notaId, datos) { if (notaId) { db.run(`UPDATE notas SET ubicacion = ?, texto = ?, fecha = ?, categoria = ? WHERE id = ?`, [datos.ubicacion, datos.texto, datos.fecha, datos.categoria || '', notaId]); return notaId; } else { const newId = generarId(); db.run(`INSERT INTO notas (id, fuente_id, ubicacion, texto, fecha, categoria) VALUES (?, ?, ?, ?, ?, ?)`, [newId, fuenteId, datos.ubicacion, datos.texto, datos.fecha, datos.categoria || '']); return newId; } }
     function eliminarNota(notaId) { db.run("DELETE FROM notas WHERE id = ?", [notaId]); }
 
+    // ---------- IMPORTACIÓN MASIVA DE NOTAS DESDE TEXTO JSON ----------
+    function importarNotasJSONdesdeTexto(fuenteId, jsonText) {
+        try {
+            const data = JSON.parse(jsonText);
+            if (!Array.isArray(data)) {
+                alert('El JSON debe contener un array de notas.');
+                return false;
+            }
+            let importadas = 0;
+            const fechaActual = new Date().toISOString().split('T')[0];
+            for (let item of data) {
+                if (!item.texto) continue;
+                const notaData = {
+                    ubicacion: item.ubicacion || '',
+                    texto: item.texto,
+                    fecha: item.fecha || fechaActual,
+                    categoria: item.categoria || ''
+                };
+                guardarNota(fuenteId, null, notaData);
+                importadas++;
+            }
+            alert(`✅ Se importaron ${importadas} notas correctamente.`);
+            return true;
+        } catch(err) {
+            alert('Error al parsear JSON: ' + err.message);
+            return false;
+        }
+    }
+
     // ---------- MARKDOWN Y CITAS ----------
     function generarMarkdownFuente(fuente) { const notas = listarNotas(fuente.id); let md = `# ${fuente.titulo}\n\n**Autores:** ${fuente.autores || 'No especificado'}\n**Año:** ${fuente.fecha_consulta || 's.f.'}\n**Tipo:** ${fuente.tipo || 'No especificado'}\n**URL:** ${fuente.url || 'No disponible'}\n\n`; if (notas.length === 0) { md += `*No hay notas registradas.*\n\n`; } else { md += `## Notas de lectura\n\n`; notas.forEach((n, idx) => { md += `### Nota ${idx+1}\n- **Ubicación:** ${n.ubicacion || 'Sin ubicación'}\n- **Fecha:** ${n.fecha || 'Sin fecha'}\n- **Categoría:** ${n.categoria || 'Sin categoría'}\n- **Contenido:**\n  ${n.texto.replace(/\n/g, '\n  ')}\n\n`; }); } const totalPalabras = notas.reduce((sum, n) => sum + (n.texto.split(/\s+/).length), 0); md += `---\n**Estadísticas:** ${notas.length} nota(s), ${totalPalabras} palabra(s) totales.\n\n**Cita APA:** ${generarCitaAPA(fuente).replace(/<[^>]*>/g, '')}\n`; return md; }
     function generarMarkdownTema(temaId) { const tema = listarTemas().find(t => t.id === temaId); if (!tema) return ''; const fuentes = listarFuentes(temaId); let md = `# Reporte de investigación: ${tema.nombre}\n\n**Fecha de generación:** ${new Date().toLocaleString()}\n**Total de fuentes:** ${fuentes.length}\n\n---\n\n`; for (let f of fuentes) { md += `## ${f.titulo}\n\n**Autores:** ${f.autores || 'No especificado'}\n**Año:** ${f.fecha_consulta || 's.f.'}\n**Tipo:** ${f.tipo || 'No especificado'}\n**URL:** ${f.url || 'No disponible'}\n\n`; const notas = listarNotas(f.id); if (notas.length === 0) { md += `*Sin notas.*\n\n`; } else { md += `### Notas de lectura\n\n`; notas.forEach((n, idx) => { md += `#### Nota ${idx+1}\n- **Ubicación:** ${n.ubicacion || 'Sin ubicación'}\n- **Fecha:** ${n.fecha || 'Sin fecha'}\n- **Categoría:** ${n.categoria || 'Sin categoría'}\n- **Contenido:**\n  ${n.texto.replace(/\n/g, '\n  ')}\n\n`; }); } const cita = generarCitaAPA(f).replace(/<[^>]*>/g, ''); md += `**Cita APA:** ${cita}\n\n---\n\n`; } const totalNotas = fuentes.reduce((sum, f) => sum + listarNotas(f.id).length, 0); const totalPalabras = fuentes.reduce((sum, f) => sum + listarNotas(f.id).reduce((s, n) => s + n.texto.split(/\s+/).length, 0), 0); md += `## Resumen global\n\n- **Fuentes analizadas:** ${fuentes.length}\n- **Total de notas:** ${totalNotas}\n- **Total de palabras en notas:** ${totalPalabras}\n`; return md; }
@@ -283,7 +365,7 @@
     function mostrarCitaAPA(fuenteId) { const fuente = obtenerFuente(fuenteId); if (!fuente) return; const cita = generarCitaAPA(fuente); document.getElementById('citaTexto').innerHTML = escapeHtml(cita); document.getElementById('modalCita').style.display = 'flex'; window.citaPlana = cita; }
     function copiarCita() { if(window.citaPlana) { navigator.clipboard.writeText(window.citaPlana); alert('Cita copiada'); } }
 
-    // ---------- MATRIZ DE HALLAZGOS ----------
+    // ---------- MATRIZ DE HALLAZGOS (igual que antes) ----------
     function mostrarMatrizHallazgos(temaId) {
         const tema = listarTemas().find(t => t.id === temaId);
         if (!tema) return;
@@ -320,8 +402,8 @@
                         </select>
                     </div>
                     <div><label>📄 Vista:</label>
-                        <button id="vistaTablaBtn" class="btn-sec ${vistaActual === 'tabla' ? 'active' : ''}" style="background:${vistaActual === 'tabla' ? '#2c7da0' : '#5f7f8c'};">📋 Tabla</button>
-                        <button id="vistaTarjetasBtn" class="btn-sec ${vistaActual === 'tarjetas' ? 'active' : ''}" style="background:${vistaActual === 'tarjetas' ? '#2c7da0' : '#5f7f8c'};">🃏 Tarjetas</button>
+                        <button id="vistaTablaBtn" class="btn-sec" style="background:${vistaActual === 'tabla' ? '#2c7da0' : '#5f7f8c'};">📋 Tabla</button>
+                        <button id="vistaTarjetasBtn" class="btn-sec" style="background:${vistaActual === 'tarjetas' ? '#2c7da0' : '#5f7f8c'};">🃏 Tarjetas</button>
                     </div>
                 </div>
                 <div id="contenedorMatrizHallazgos"></div>
@@ -342,26 +424,14 @@
             let notasFiltradas = todasNotas;
             if (filtro === 'SIN_CATEGORIA') notasFiltradas = todasNotas.filter(n => !n.categoria);
             else if (filtro !== 'TODAS') notasFiltradas = todasNotas.filter(n => n.categoria === filtro);
-            if (vistaActual === 'tabla') {
-                renderTabla(notasFiltradas);
-            } else {
-                renderTarjetas(notasFiltradas);
-            }
+            if (vistaActual === 'tabla') renderTabla(notasFiltradas);
+            else renderTarjetas(notasFiltradas);
         }
 
         function renderTabla(notas) {
-            let html = `<table class="matriz-tabla" id="matrizHallazgosTabla">
-                            <thead><tr><th>Fuente</th><th>Autores/Año</th><th>Ubicación</th><th>Hallazgo / Nota</th><th>Categoría</th><th>Acción</th></tr></thead>
-                            <tbody>`;
+            let html = `<table class="matriz-tabla" id="matrizHallazgosTabla"><thead><tr><th>Fuente</th><th>Autores/Año</th><th>Ubicación</th><th>Hallazgo / Nota</th><th>Categoría</th><th>Acción</th></tr></thead><tbody>`;
             for (let n of notas) {
-                html += `<tr data-nota-id="${n.id}">
-                            <td>${escapeHtml(n.fuente)}</td>
-                            <td>${escapeHtml(n.autores)} ${n.anio ? `(${n.anio})` : ''}</td>
-                            <td>${escapeHtml(n.ubicacion)}</td>
-                            <td>${escapeHtml(n.texto)}</td>
-                            <td><input type="text" class="categoria-input" data-id="${n.id}" value="${escapeHtml(n.categoria)}" list="categoriasList" style="width:100%;"><datalist id="categoriasList">${Array.from(new Set(todasNotas.map(nn => nn.categoria))).filter(c=>c).map(c=>`<option>${c}</option>`).join('')}</datalist></td>
-                            <td><button class="guardar-categoria" data-id="${n.id}">💾 Guardar</button></td>
-                          </tr>`;
+                html += `<tr data-nota-id="${n.id}"><td>${escapeHtml(n.fuente)}</td><td>${escapeHtml(n.autores)} ${n.anio ? `(${n.anio})` : ''}</td><td>${escapeHtml(n.ubicacion)}</td><td>${escapeHtml(n.texto)}</td><td><input type="text" class="categoria-input" data-id="${n.id}" value="${escapeHtml(n.categoria)}" list="categoriasList" style="width:100%;"><datalist id="categoriasList">${Array.from(new Set(todasNotas.map(nn => nn.categoria))).filter(c=>c).map(c=>`<option>${c}</option>`).join('')}</datalist></td><td><button class="guardar-categoria" data-id="${n.id}">💾 Guardar</button></td></tr>`;
             }
             if (notas.length === 0) html += '<tr><td colspan="6">No hay notas con este filtro.</td></tr>';
             html += `</tbody></table>`;
@@ -414,24 +484,23 @@
         vistaTablaBtn.addEventListener('click', () => { vistaActual = 'tabla'; actualizarVista(); });
         vistaTarjetasBtn.addEventListener('click', () => { vistaActual = 'tarjetas'; actualizarVista(); });
         actualizarVista();
-
         document.getElementById('exportarMatrizHallazgosCSV')?.addEventListener('click', () => exportarMatrizHallazgosCSV(tema.nombre, filtroSelect.value));
         document.getElementById('cerrarMatrizHallazgos')?.addEventListener('click', () => modalDiv.remove());
     }
 
     function exportarMatrizHallazgosCSV(temaNombre, filtro) {
         const tabla = document.getElementById('matrizHallazgosTabla');
-        if (!tabla) { alert('Primero cambia a vista de tabla para exportar'); return; }
+        if (!tabla) { alert('Primero cambia a vista de tabla'); return; }
         const filas = tabla.querySelectorAll('tbody tr');
         let csv = [['Fuente','Autores/Año','Ubicación','Hallazgo','Categoría'].join(',')];
         filas.forEach(row => {
             const celdas = row.querySelectorAll('td');
-            if (celdas.length >= 5 && row.cells) {
-                const fuente = row.cells[0].innerText.replace(/,/g, ';');
-                const autores = row.cells[1].innerText.replace(/,/g, ';');
-                const ubicacion = row.cells[2].innerText.replace(/,/g, ';');
-                const hallazgo = row.cells[3].innerText.replace(/,/g, ';');
-                const categoriaInput = row.cells[4].querySelector('input');
+            if (celdas.length >= 5) {
+                const fuente = celdas[0].innerText.replace(/,/g, ';');
+                const autores = celdas[1].innerText.replace(/,/g, ';');
+                const ubicacion = celdas[2].innerText.replace(/,/g, ';');
+                const hallazgo = celdas[3].innerText.replace(/,/g, ';');
+                const categoriaInput = celdas[4].querySelector('input');
                 const categoria = categoriaInput ? categoriaInput.value.replace(/,/g, ';') : '';
                 csv.push([fuente, autores, ubicacion, hallazgo, categoria].join(','));
             }
@@ -492,7 +561,11 @@
                         </div>
                     </div>
                     <div><a href="${escapeHtml(f.url)}" target="_blank" style="color:#2c7da0;">${escapeHtml(f.url)}</a> | Consulta: ${f.fecha_consulta || '—'}</div>
-                    <div style="margin-top:0.8rem;"><strong>📌 Notas de lectura:</strong> <button class="btn-accion btn-editar" data-agregar-nota="${f.id}" style="padding:2px 8px;">➕ Agregar nota</button></div>
+                    <div style="margin-top:0.8rem;" class="notas-header">
+                        <strong>📌 Notas de lectura:</strong>
+                        <button class="btn-accion btn-editar" data-agregar-nota="${f.id}" style="padding:2px 8px;">➕ Agregar nota</button>
+                        <button class="btn-accion" data-importar-notas-json="${f.id}" style="background:#6b4e2e;">📂 Importar notas (JSON)</button>
+                    </div>
                     <div class="notas-lista">`;
                 if (notas.length) {
                     notas.forEach(n => {
@@ -520,6 +593,19 @@
         document.querySelectorAll('[data-cita-fuente]').forEach(btn => btn.addEventListener('click', () => mostrarCitaAPA(btn.getAttribute('data-cita-fuente'))));
         document.querySelectorAll('[data-markdown-fuente]').forEach(btn => btn.addEventListener('click', () => { const fuente = obtenerFuente(btn.getAttribute('data-markdown-fuente')); if (fuente) { const md = generarMarkdownFuente(fuente); abrirEditorMarkdown(md, `reporte_${fuente.titulo.replace(/\s/g, '_')}.md`); } }));
         document.querySelectorAll('[data-agregar-nota]').forEach(btn => btn.addEventListener('click', () => abrirModalNota(btn.getAttribute('data-agregar-nota'), null)));
+        
+        // Importar notas JSON mediante modal
+        document.querySelectorAll('[data-importar-notas-json]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const fuenteId = btn.getAttribute('data-importar-notas-json');
+                pendingFuenteIdForJSON = fuenteId;
+                // Limpiar textarea y poner un ejemplo
+                const textarea = document.getElementById('jsonNotasInput');
+                textarea.value = `[\n  {\n    "ubicacion": "p. 23",\n    "texto": "Ejemplo de nota",\n    "categoria": "Hallazgo"\n  }\n]`;
+                document.getElementById('modalImportarNotasJSON').style.display = 'flex';
+            });
+        });
+        
         document.querySelectorAll('[data-editar-nota]').forEach(btn => { const [fId, nId] = btn.getAttribute('data-editar-nota').split('|'); btn.addEventListener('click', () => abrirModalNota(fId, nId)); });
         document.querySelectorAll('[data-eliminar-nota]').forEach(btn => btn.addEventListener('click', () => { if(confirm('¿Eliminar nota?')) eliminarNota(btn.getAttribute('data-eliminar-nota')); renderizarTodo(); }));
     }
@@ -693,8 +779,8 @@
     function exportarDB() { const data = db.export(); const blob = new Blob([data], {type: 'application/octet-stream'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `investigacion_${new Date().toISOString().slice(0,19)}.db`; a.click(); URL.revokeObjectURL(url); }
 
     function importarDBReemplazar(file) {
-        if (!SQL) { alert("La librería SQL no está lista."); return; }
-        if (!confirm('⚠️ Esta acción reemplazará TODOS los datos actuales por los del archivo. ¿Continuar?')) return;
+        if (!SQL) { alert("SQL no listo"); return; }
+        if (!confirm('⚠️ Reemplazará TODOS los datos actuales. ¿Continuar?')) return;
         const reader = new FileReader();
         reader.onload = e => {
             try {
@@ -704,100 +790,248 @@
                 dbInitialized = true;
                 temaActivoId = null;
                 renderizarTodo();
-                alert('Base de datos reemplazada correctamente.');
-            } catch (err) { alert('Error al importar: ' + err.message); }
+                alert('Base de datos reemplazada.');
+            } catch (err) { alert('Error: ' + err.message); }
         };
         reader.readAsArrayBuffer(file);
     }
 
-    // NUEVA FUNCIÓN: COMBINAR CON FUSIÓN DE TEMAS POR NOMBRE
     function importarDBCombinar(file) {
-        if (!SQL) { alert("La librería SQL no está lista."); return; }
+        if (!SQL) { alert("SQL no listo"); return; }
         const reader = new FileReader();
         reader.onload = e => {
             try {
                 const array = new Uint8Array(e.target.result);
                 const newDb = new SQL.Database(array);
-                
-                // 1. Obtener temas actuales y sus nombres (para comparación)
-                const temasExistentes = listarTemas(); // array de {id, nombre}
+                const temasExistentes = listarTemas();
                 const mapaNombreAId = new Map();
                 temasExistentes.forEach(t => mapaNombreAId.set(t.nombre.toLowerCase(), t.id));
-                
-                // 2. Leer temas de la DB importada
                 const temasImportados = [];
                 const stmtTemas = newDb.prepare("SELECT id, nombre FROM temas");
                 while (stmtTemas.step()) temasImportados.push(stmtTemas.getAsObject());
                 stmtTemas.free();
-                
-                // Mapa de ID_original -> ID_destino para temas
                 const temaIdMap = new Map();
                 for (let t of temasImportados) {
                     const nombreLower = t.nombre.toLowerCase();
                     if (mapaNombreAId.has(nombreLower)) {
-                        // Tema duplicado: usar el existente
                         temaIdMap.set(t.id, mapaNombreAId.get(nombreLower));
                     } else {
-                        // Tema nuevo: insertar (generar nuevo ID para evitar conflictos)
                         const newId = generarId();
                         db.run("INSERT INTO temas (id, nombre) VALUES (?, ?)", [newId, t.nombre]);
                         temaIdMap.set(t.id, newId);
-                        mapaNombreAId.set(nombreLower, newId); // para futuros mapeos
+                        mapaNombreAId.set(nombreLower, newId);
                     }
                 }
-                
-                // 3. Procesar fuentes de la DB importada
                 const fuentesImportadas = [];
                 const stmtFuentes = newDb.prepare("SELECT * FROM fuentes");
-                const columnasFuentes = stmtFuentes.getColumnNames();
                 while (stmtFuentes.step()) fuentesImportadas.push(stmtFuentes.getAsObject());
                 stmtFuentes.free();
-                
-                const fuenteIdMap = new Map(); // ID_original -> ID_destino (puede cambiar si hay conflicto)
+                const fuenteIdMap = new Map();
                 for (let f of fuentesImportadas) {
                     const nuevoTemaId = temaIdMap.get(f.tema_id);
-                    if (!nuevoTemaId) continue; // no debería pasar
-                    
-                    // Verificar si ya existe una fuente con el mismo ID en la DB actual
+                    if (!nuevoTemaId) continue;
                     const existe = db.exec("SELECT id FROM fuentes WHERE id = ?", [f.id]);
                     let nuevoId = f.id;
-                    let conflicto = (existe.length > 0 && existe[0].values && existe[0].values.length > 0);
-                    if (conflicto) {
-                        nuevoId = generarId(); // ID nuevo para evitar colisión
-                    }
-                    // Insertar la fuente (sin duplicados por ID, pero permitiendo duplicados de título)
+                    if (existe.length > 0 && existe[0].values && existe[0].values.length > 0) nuevoId = generarId();
                     db.run(`INSERT INTO fuentes (id, tema_id, titulo, url, fecha_consulta, tipo, autores) VALUES (?, ?, ?, ?, ?, ?, ?)`,
                         [nuevoId, nuevoTemaId, f.titulo, f.url, f.fecha_consulta, f.tipo, f.autores]);
                     fuenteIdMap.set(f.id, nuevoId);
                 }
-                
-                // 4. Procesar notas
                 const notasImportadas = [];
                 const stmtNotas = newDb.prepare("SELECT * FROM notas");
                 while (stmtNotas.step()) notasImportadas.push(stmtNotas.getAsObject());
                 stmtNotas.free();
-                
                 for (let n of notasImportadas) {
                     const nuevaFuenteId = fuenteIdMap.get(n.fuente_id);
                     if (!nuevaFuenteId) continue;
-                    // Evitar conflicto de ID de nota
                     const existeNota = db.exec("SELECT id FROM notas WHERE id = ?", [n.id]);
                     let nuevoIdNota = n.id;
-                    if (existeNota.length > 0 && existeNota[0].values && existeNota[0].values.length > 0) {
-                        nuevoIdNota = generarId();
-                    }
+                    if (existeNota.length > 0 && existeNota[0].values && existeNota[0].values.length > 0) nuevoIdNota = generarId();
                     db.run(`INSERT INTO notas (id, fuente_id, ubicacion, texto, fecha, categoria) VALUES (?, ?, ?, ?, ?, ?)`,
                         [nuevoIdNota, nuevaFuenteId, n.ubicacion, n.texto, n.fecha, n.categoria]);
                 }
-                
                 newDb.close();
                 renderizarTodo();
-                alert('Datos combinados correctamente. Los temas duplicados se han fusionado por nombre.');
-            } catch (err) {
-                alert('Error al combinar: ' + err.message);
-            }
+                alert('Datos combinados correctamente.');
+            } catch (err) { alert('Error al combinar: ' + err.message); }
         };
         reader.readAsArrayBuffer(file);
+    }
+
+    // ---------- SESIÓN EN LOCALSTORAGE (DB completa) ----------
+    const STORAGE_KEY = 'investigador_pro_sesion_db';
+
+    function guardarSesion() {
+        try {
+            const dbData = db.export();
+            const base64 = btoa(String.fromCharCode.apply(null, dbData));
+            localStorage.setItem(STORAGE_KEY, base64);
+            alert('✅ Sesión guardada en localStorage.');
+        } catch(e) { alert('Error al guardar sesión: ' + e.message); }
+    }
+
+    function cargarSesion() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) { alert('No hay sesión guardada.'); return; }
+        try {
+            const binary = atob(saved);
+            const array = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
+            if (db) db.close();
+            db = new SQL.Database(array);
+            dbInitialized = true;
+            temaActivoId = null;
+            renderizarTodo();
+            alert('✅ Sesión restaurada.');
+        } catch(e) { alert('Error al restaurar sesión: ' + e.message); }
+    }
+
+    function borrarSesion() {
+        if (confirm('¿Borrar la sesión guardada? (no afecta los datos actuales)')) {
+            localStorage.removeItem(STORAGE_KEY);
+            alert('Sesión borrada.');
+        }
+    }
+
+    // ---------- EXPORTAR/IMPORTAR JSON (compatible) ----------
+    function exportarTodoJSON() {
+        const temasObj = [];
+        const temasList = listarTemas();
+        for (let t of temasList) {
+            const fuentes = listarFuentes(t.id);
+            const fuentesObj = [];
+            for (let f of fuentes) {
+                const notas = listarNotas(f.id);
+                fuentesObj.push({
+                    id: f.id,
+                    titulo: f.titulo,
+                    url: f.url,
+                    fechaConsulta: f.fecha_consulta,
+                    tipo: f.tipo,
+                    autores: f.autores,
+                    notas: notas.map(n => ({ id: n.id, ubicacion: n.ubicacion, texto: n.texto, fecha: n.fecha, categoria: n.categoria }))
+                });
+            }
+            temasObj.push({ id: t.id, nombre: t.nombre, fuentes: fuentesObj });
+        }
+        const data = JSON.stringify(temasObj, null, 2);
+        const blob = new Blob([data], {type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `investigacion_${new Date().toISOString().slice(0,19)}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    function exportarTemaJSON() {
+        const tema = listarTemas().find(t => t.id === temaActivoId);
+        if (!tema) { alert('Selecciona un tema primero'); return; }
+        const fuentes = listarFuentes(tema.id);
+        const fuentesObj = [];
+        for (let f of fuentes) {
+            const notas = listarNotas(f.id);
+            fuentesObj.push({
+                id: f.id,
+                titulo: f.titulo,
+                url: f.url,
+                fechaConsulta: f.fecha_consulta,
+                tipo: f.tipo,
+                autores: f.autores,
+                notas: notas.map(n => ({ id: n.id, ubicacion: n.ubicacion, texto: n.texto, fecha: n.fecha, categoria: n.categoria }))
+            });
+        }
+        const temaObj = { id: tema.id, nombre: tema.nombre, fuentes: fuentesObj };
+        const data = JSON.stringify(temaObj, null, 2);
+        const blob = new Blob([data], {type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `tema_${tema.nombre.replace(/\s/g, '_')}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    function importarJSONAdd(file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = JSON.parse(e.target.result);
+                const items = Array.isArray(data) ? data : [data];
+                for (let item of items) {
+                    if (!item.nombre) continue;
+                    const existe = listarTemas().some(t => t.nombre.toLowerCase() === item.nombre.toLowerCase());
+                    let temaId;
+                    if (existe) {
+                        if (!confirm(`El tema "${item.nombre}" ya existe. ¿Deseas añadir sus fuentes al tema existente?`)) continue;
+                        const temaExistente = listarTemas().find(t => t.nombre.toLowerCase() === item.nombre.toLowerCase());
+                        temaId = temaExistente.id;
+                    } else {
+                        temaId = crearTema(item.nombre);
+                    }
+                    if (!temaId) continue;
+                    for (let f of (item.fuentes || [])) {
+                        const fuenteData = {
+                            titulo: f.titulo || 'Sin título',
+                            url: f.url || '',
+                            fechaConsulta: f.fechaConsulta || '',
+                            tipo: f.tipo || '',
+                            autores: f.autores || ''
+                        };
+                        const fuenteId = guardarFuente(temaId, null, fuenteData);
+                        for (let n of (f.notas || [])) {
+                            guardarNota(fuenteId, null, {
+                                ubicacion: n.ubicacion || '',
+                                texto: n.texto || '',
+                                fecha: n.fecha || '',
+                                categoria: n.categoria || ''
+                            });
+                        }
+                    }
+                }
+                renderizarTodo();
+                alert('JSON importado correctamente.');
+            } catch(err) { alert('Error al parsear JSON: ' + err.message); }
+        };
+        reader.readAsText(file);
+    }
+
+    function reemplazarTodoConJSON(file) {
+        if (!confirm('⚠️ Esto reemplazará TODOS los datos actuales por los del JSON. ¿Continuar?')) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = JSON.parse(e.target.result);
+                db.exec("DELETE FROM notas");
+                db.exec("DELETE FROM fuentes");
+                db.exec("DELETE FROM temas");
+                const items = Array.isArray(data) ? data : [data];
+                for (let item of items) {
+                    if (!item.nombre) continue;
+                    const temaId = crearTema(item.nombre);
+                    for (let f of (item.fuentes || [])) {
+                        const fuenteData = {
+                            titulo: f.titulo || 'Sin título',
+                            url: f.url || '',
+                            fechaConsulta: f.fechaConsulta || '',
+                            tipo: f.tipo || '',
+                            autores: f.autores || ''
+                        };
+                        const fuenteId = guardarFuente(temaId, null, fuenteData);
+                        for (let n of (f.notas || [])) {
+                            guardarNota(fuenteId, null, {
+                                ubicacion: n.ubicacion || '',
+                                texto: n.texto || '',
+                                fecha: n.fecha || '',
+                                categoria: n.categoria || ''
+                            });
+                        }
+                    }
+                }
+                temaActivoId = null;
+                renderizarTodo();
+                alert('Datos reemplazados con JSON.');
+            } catch(err) { alert('Error: ' + err.message); }
+        };
+        reader.readAsText(file);
     }
 
     // ---------- PDF ----------
@@ -932,7 +1166,7 @@
 
     function copiarMarkdown() {
         const contenido = document.getElementById('editorMarkdown').value;
-        navigator.clipboard.writeText(contenido).then(() => alert('Markdown copiado al portapapeles'));
+        navigator.clipboard.writeText(contenido).then(() => alert('Markdown copiado'));
     }
 
     // ---------- INICIALIZACIÓN ----------
@@ -949,10 +1183,9 @@
         }
         renderizarTodo();
 
-        // Inicializar Google Drive
         initGoogleDrive();
 
-        // Eventos UI
+        // Eventos generales
         document.getElementById('btnCrearTema').addEventListener('click', () => { const nombre = document.getElementById('nuevoTemaNombre').value; if(crearTema(nombre)) { document.getElementById('nuevoTemaNombre').value = ''; renderizarTodo(); } });
         document.getElementById('btnExportarDB').addEventListener('click', exportarDB);
         document.getElementById('btnImportarReemplazar').addEventListener('click', () => document.getElementById('importDBReemplazar').click());
@@ -983,7 +1216,43 @@
         document.getElementById('btnCerrarMarkdown').addEventListener('click', () => document.getElementById('modalMarkdown').style.display = 'none');
         document.getElementById('editorMarkdown').addEventListener('input', actualizarVistaPrevia);
         configurarBarraHerramientas();
-        window.addEventListener('click', e => {
+        document.getElementById('btnGuardarSesion').addEventListener('click', guardarSesion);
+        document.getElementById('btnCargarSesion').addEventListener('click', cargarSesion);
+        document.getElementById('btnBorrarSesion').addEventListener('click', borrarSesion);
+        document.getElementById('btnExportarTodoJSON').addEventListener('click', exportarTodoJSON);
+        document.getElementById('btnExportarTemaJSON').addEventListener('click', exportarTemaJSON);
+        document.getElementById('btnImportarJSONAdd').addEventListener('click', () => document.getElementById('importJSONAdd').click());
+        document.getElementById('btnReemplazarTodoJSON').addEventListener('click', () => document.getElementById('importJSONReplace').click());
+        document.getElementById('importJSONAdd').addEventListener('change', e => { if(e.target.files.length) importarJSONAdd(e.target.files[0]); e.target.value = ''; });
+        document.getElementById('importJSONReplace').addEventListener('change', e => { if(e.target.files.length) reemplazarTodoConJSON(e.target.files[0]); e.target.value = ''; });
+
+        // Manejadores del modal de importación de notas JSON
+        const modalJSON = document.getElementById('modalImportarNotasJSON');
+        const btnConfirmar = document.getElementById('btnConfirmarImportarNotasJSON');
+        const btnCancelar = document.getElementById('btnCancelarImportarNotasJSON');
+        btnConfirmar.addEventListener('click', () => {
+            if (pendingFuenteIdForJSON) {
+                const jsonText = document.getElementById('jsonNotasInput').value;
+                const exito = importarNotasJSONdesdeTexto(pendingFuenteIdForJSON, jsonText);
+                if (exito) {
+                    renderizarTodo(); // refrescar vista
+                }
+                modalJSON.style.display = 'none';
+                pendingFuenteIdForJSON = null;
+            } else {
+                alert('No se identificó la fuente destino.');
+                modalJSON.style.display = 'none';
+            }
+        });
+        btnCancelar.addEventListener('click', () => {
+            modalJSON.style.display = 'none';
+            pendingFuenteIdForJSON = null;
+        });
+        window.addEventListener('click', (e) => {
+            if(e.target === modalJSON) {
+                modalJSON.style.display = 'none';
+                pendingFuenteIdForJSON = null;
+            }
             if(e.target === document.getElementById('modalResultados')) document.getElementById('modalResultados').style.display = 'none';
             if(e.target === document.getElementById('modalFuente')) cerrarModalFuente();
             if(e.target === document.getElementById('modalNota')) cerrarModalNota();

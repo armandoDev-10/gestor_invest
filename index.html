@@ -11,7 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        /* Tus estilos actuales (sin cambios) */
+        /* (Mantén todos tus estilos exactamente como están, no los modifico) */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, 'Segoe UI', 'Inter', sans-serif; }
         body { background: #f0f4f8; padding: 2rem 1.5rem; }
         .container { max-width: 1600px; margin: 0 auto; }
@@ -178,6 +178,33 @@
         renderTimeout = setTimeout(() => {
             renderizarTodo();
         }, 100);
+    }
+
+    // ---------- GUARDADO AUTOMÁTICO SILENCIOSO (NUEVO) ----------
+    function guardarSesionSilenciosa() {
+        try {
+            const dbData = db.export();
+            const base64 = btoa(String.fromCharCode.apply(null, dbData));
+            localStorage.setItem(STORAGE_KEY, base64);
+            // Opcional: pequeño indicador visual (descomentar si se desea)
+            // mostrarToast("💾 Guardado automático");
+        } catch(e) {
+            console.error("Error al guardar sesión automática:", e);
+        }
+    }
+
+    // Opcional: Toast para feedback visual (silencioso)
+    function mostrarToast(mensaje) {
+        let toast = document.getElementById('toastMensaje');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'toastMensaje';
+            toast.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#1e4a62; color:white; padding:8px 16px; border-radius:2rem; font-size:0.8rem; z-index:10001; opacity:0; transition:opacity 0.3s; pointer-events:none;';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = mensaje;
+        toast.style.opacity = '1';
+        setTimeout(() => { toast.style.opacity = '0'; }, 1500);
     }
 
     // ---------- GOOGLE DRIVE ----------
@@ -810,7 +837,7 @@
         const tema = temas.find(t => t.id === id);
         if (tema) {
             let nuevo = prompt('Editar nombre del tema:', tema.nombre);
-            if (nuevo && nuevo.trim()) { actualizarTema(id, nuevo.trim()); renderizarTodo(); }
+            if (nuevo && nuevo.trim()) { actualizarTema(id, nuevo.trim()); renderizarTodo(); guardarSesionSilenciosa(); }
         }
     }
 
@@ -856,9 +883,8 @@
             div.addEventListener('click', (e) => { if (e.target.tagName !== 'BUTTON') seleccionarTema(t.id); });
             container.appendChild(div);
         });
-        // Los eventos de data-editar-tema y data-eliminar-tema se manejarán por delegación, pero aquí mantenemos los listeners de tema (porque son clics en el div, no en botones)
         document.querySelectorAll('[data-editar-tema]').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); editarTema(btn.getAttribute('data-editar-tema')); }));
-        document.querySelectorAll('[data-eliminar-tema]').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); if (confirm('¿Eliminar tema y todo su contenido?')) { eliminarTema(btn.getAttribute('data-eliminar-tema')); renderizarTodo(); } }));
+        document.querySelectorAll('[data-eliminar-tema]').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); if (confirm('¿Eliminar tema y todo su contenido?')) { eliminarTema(btn.getAttribute('data-eliminar-tema')); renderizarTodo(); guardarSesionSilenciosa(); } }));
     }
 
     function seleccionarTema(id) { temaActivoId = id; renderizarTemas(); renderizarDetalle(); }
@@ -907,20 +933,27 @@
         }
         detalleElem.innerHTML = html;
         
-        // Los listeners de eventos se manejarán globalmente, excepto los de input y change que aún necesitan asignación local
         // Checkbox modo proyecto
         const chkModo = document.getElementById('modoProyectoCheckbox');
         if (chkModo) {
-            chkModo.addEventListener('change', (e) => { proyectoData.modoActivo = e.target.checked; guardarProyectoData(tema.id, proyectoData); renderizarDetalle(); });
+            chkModo.addEventListener('change', (e) => { proyectoData.modoActivo = e.target.checked; guardarProyectoData(tema.id, proyectoData); renderizarDetalle(); guardarSesionSilenciosa(); });
         }
-        // Listeners de input para campos del proyecto
+        // Listeners de input para campos del proyecto con guardado silencioso
         if (proyectoData.modoActivo) {
             const inputTitulo = document.getElementById('proyectoTitulo');
             const inputPregInv = document.getElementById('proyectoPreguntaInv');
             const inputPregTrab = document.getElementById('proyectoPreguntasTrabajo');
             const inputObjGen = document.getElementById('proyectoObjGeneral');
             const inputObjPart = document.getElementById('proyectoObjParticulares');
-            const guardarCampo = () => { proyectoData.titulo = inputTitulo?.value || ''; proyectoData.preguntaInvestigacion = inputPregInv?.value || ''; proyectoData.preguntasTrabajo = inputPregTrab?.value || ''; proyectoData.objetivoGeneral = inputObjGen?.value || ''; proyectoData.objetivosParticulares = inputObjPart?.value || ''; guardarProyectoData(tema.id, proyectoData); };
+            const guardarCampo = () => { 
+                proyectoData.titulo = inputTitulo?.value || ''; 
+                proyectoData.preguntaInvestigacion = inputPregInv?.value || ''; 
+                proyectoData.preguntasTrabajo = inputPregTrab?.value || ''; 
+                proyectoData.objetivoGeneral = inputObjGen?.value || ''; 
+                proyectoData.objetivosParticulares = inputObjPart?.value || ''; 
+                guardarProyectoData(tema.id, proyectoData); 
+                guardarSesionSilenciosa();
+            };
             if (inputTitulo) inputTitulo.addEventListener('input', guardarCampo);
             if (inputPregInv) inputPregInv.addEventListener('input', guardarCampo);
             if (inputPregTrab) inputPregTrab.addEventListener('input', guardarCampo);
@@ -929,12 +962,26 @@
             
             const btnAgregarSeccion = document.getElementById('btnAgregarSeccion');
             if (btnAgregarSeccion) {
-                btnAgregarSeccion.addEventListener('click', () => { if (!proyectoData.secciones) proyectoData.secciones = []; proyectoData.secciones.push({ titulo: 'Nueva sección', contenido: '' }); guardarProyectoData(tema.id, proyectoData); renderizarDetalle(); });
+                btnAgregarSeccion.addEventListener('click', () => { 
+                    if (!proyectoData.secciones) proyectoData.secciones = []; 
+                    proyectoData.secciones.push({ titulo: 'Nueva sección', contenido: '' }); 
+                    guardarProyectoData(tema.id, proyectoData); 
+                    renderizarDetalle(); 
+                    guardarSesionSilenciosa();
+                });
             }
             const seccionesContainer = document.getElementById('seccionesContainer');
             if (seccionesContainer) {
                 seccionesContainer.addEventListener('click', (e) => {
-                    if (e.target.classList.contains('eliminar-seccion')) { const idx = parseInt(e.target.getAttribute('data-idx')); if (!isNaN(idx)) { proyectoData.secciones.splice(idx, 1); guardarProyectoData(tema.id, proyectoData); renderizarDetalle(); } }
+                    if (e.target.classList.contains('eliminar-seccion')) { 
+                        const idx = parseInt(e.target.getAttribute('data-idx')); 
+                        if (!isNaN(idx)) { 
+                            proyectoData.secciones.splice(idx, 1); 
+                            guardarProyectoData(tema.id, proyectoData); 
+                            renderizarDetalle(); 
+                            guardarSesionSilenciosa();
+                        } 
+                    }
                 });
                 seccionesContainer.addEventListener('input', (e) => {
                     const target = e.target;
@@ -946,13 +993,13 @@
                                 if (target.classList.contains('seccion-titulo')) proyectoData.secciones[idx].titulo = target.value;
                                 if (target.classList.contains('seccion-contenido')) proyectoData.secciones[idx].contenido = target.value;
                                 guardarProyectoData(tema.id, proyectoData);
+                                guardarSesionSilenciosa();
                             }
                         }
                     }
                 });
             }
         }
-        // Nota: ya no asignamos eventos a los botones dinámicos (data-editar-fuente, etc.) porque se manejarán por delegación global.
     }
 
     function renderizarTodo() {
@@ -990,6 +1037,7 @@
         guardarFuente(temaId, fuenteEnEdicionId, datos);
         cerrarModalFuente();
         renderizarTodoDebounced();
+        guardarSesionSilenciosa();
     }
     function cerrarModalFuente() { document.getElementById('modalFuente').style.display = 'none'; fuenteEnEdicionId = null; }
     function abrirModalNota(fuenteId, notaId) {
@@ -1011,10 +1059,11 @@
         guardarNota(fuenteId, notaEnEdicion?.notaId || null, datos);
         cerrarModalNota();
         renderizarTodoDebounced();
+        guardarSesionSilenciosa();
     }
     function cerrarModalNota() { document.getElementById('modalNota').style.display = 'none'; notaEnEdicion = null; }
 
-    // ---------- INICIALIZACIÓN CON DELEGACIÓN DE EVENTOS ----------
+    // ---------- INICIALIZACIÓN CON DELEGACIÓN DE EVENTOS Y GUARDADO AUTOMÁTICO ----------
     window.addEventListener('DOMContentLoaded', async () => {
         await initDatabase();
 
@@ -1088,21 +1137,25 @@
         initGoogleDrive();
         configurarBarraHerramientas();
 
+        // Guardado automático periódico cada 5 minutos (opcional, ya tenemos guardado en cada cambio)
+        setInterval(() => {
+            if (db) guardarSesionSilenciosa();
+        }, 300000); // cada 5 minutos
+
         // ---------- DELEGACIÓN DE EVENTOS (UN SOLO LISTENER PARA TODOS LOS BOTONES) ----------
         document.body.addEventListener('click', (e) => {
-            // Obtener el botón más cercano (para casos donde se haga clic en icono o span dentro del botón)
             const btn = e.target.closest('button');
             if (!btn) return;
 
             const id = btn.id;
 
-            // Mapeo de ID a función (para botones con ID único)
             const acciones = {
                 'btnCrearTema': () => {
                     const nombre = document.getElementById('nuevoTemaNombre').value;
                     if (crearTema(nombre)) {
                         document.getElementById('nuevoTemaNombre').value = '';
                         renderizarTodo();
+                        guardarSesionSilenciosa();
                     }
                 },
                 'btnGuardarSesion': () => guardarSesion(),
@@ -1143,6 +1196,7 @@
                         if (importarNotasJSONdesdeTexto(pendingFuenteIdForJSON, jsonText)) renderizarTodo();
                         document.getElementById('modalImportarNotasJSON').style.display = 'none';
                         pendingFuenteIdForJSON = null;
+                        guardarSesionSilenciosa();
                     } else {
                         alert('No se identificó la fuente destino.');
                         document.getElementById('modalImportarNotasJSON').style.display = 'none';
@@ -1170,13 +1224,14 @@
                 return;
             }
 
-            // Manejar botones con atributos data-* (dinámicos)
+            // Botones con data-*
             if (btn.matches('[data-editar-tema]')) {
                 editarTema(btn.getAttribute('data-editar-tema'));
             } else if (btn.matches('[data-eliminar-tema]')) {
                 if (confirm('¿Eliminar tema y todo su contenido?')) {
                     eliminarTema(btn.getAttribute('data-eliminar-tema'));
                     renderizarTodo();
+                    guardarSesionSilenciosa();
                 }
             } else if (btn.matches('[data-editar-fuente]')) {
                 abrirModalFuente(btn.getAttribute('data-editar-fuente'));
@@ -1184,6 +1239,7 @@
                 if (confirm('¿Eliminar fuente y sus notas?')) {
                     eliminarFuente(btn.getAttribute('data-eliminar-fuente'));
                     renderizarTodoDebounced();
+                    guardarSesionSilenciosa();
                 }
             } else if (btn.matches('[data-matriz-fuente]')) {
                 mostrarMatrizFuente(btn.getAttribute('data-matriz-fuente'));
@@ -1208,9 +1264,9 @@
                 if (confirm('¿Eliminar nota?')) {
                     eliminarNota(btn.getAttribute('data-eliminar-nota'));
                     renderizarTodoDebounced();
+                    guardarSesionSilenciosa();
                 }
             } else if (btn.classList.contains('eliminar-seccion')) {
-                // Eliminar sección del modo proyecto
                 const idx = parseInt(btn.getAttribute('data-idx'));
                 if (!isNaN(idx) && temaActivoId) {
                     const proyectoData = obtenerProyectoData(temaActivoId);
@@ -1218,12 +1274,13 @@
                         proyectoData.secciones.splice(idx, 1);
                         guardarProyectoData(temaActivoId, proyectoData);
                         renderizarDetalle();
+                        guardarSesionSilenciosa();
                     }
                 }
             }
         });
 
-        // Listeners para cerrar modales con click en el overlay (fondo)
+        // Cierre de modales con overlay
         window.addEventListener('click', (e) => {
             if (e.target.classList.contains('modal')) e.target.style.display = 'none';
         });
@@ -1231,7 +1288,7 @@
 </script>
 
 <footer style="text-align: center; margin-top: 3rem; padding: 1rem; font-size: 0.75rem; color: #5f7f8c; border-top: 1px solid #cbdde6;">
-    <p>🧠 Investigador PRO · Desarrollado por <strong>ArmandoTech</strong> con la colaboración de <strong>Asistente IA</strong> · 📚 v1.0.1</p>
+    <p>🧠 Investigador PRO · Desarrollado por <strong>ArmandoTech</strong> con la colaboración de <strong>Asistente IA</strong> · 📚 v1.0.2</p>
 </footer>
 </body>
 </html>

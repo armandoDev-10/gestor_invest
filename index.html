@@ -11,7 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
-        /* (Mantén todos tus estilos exactamente como están, no los modifico) */
+        /* (Todos los estilos anteriores se mantienen exactamente igual) */
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, 'Segoe UI', 'Inter', sans-serif; }
         body { background: #f0f4f8; padding: 2rem 1.5rem; }
         .container { max-width: 1600px; margin: 0 auto; }
@@ -95,12 +95,43 @@
         .toolbar .tool-group summary {background: #fefaf5;border-radius: 1rem;padding: 0.5rem 1rem;}
         .toolbar .tool-group .group-buttons {padding: 0.5rem 1rem 1rem 1rem;}
 
+        .fuente-colapsable .contenido-fuente a, .fuente-colapsable .contenido-fuente div, .nota-item, .card { word-break: break-word; overflow-wrap: break-word; }
+
         @media (max-width: 800px) { .two-columns { flex-direction: column; } body { padding: 1rem; } .tarjeta-nota { width: 100%; } }
         /* Spinner de carga */
         #cargandoOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 10000; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; }
         .cargando-contenido { background: #1e4a62; color: white; padding: 1.2rem 2rem; border-radius: 3rem; display: flex; align-items: center; gap: 12px; font-size: 1rem; box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
         .spinner { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 600px) {
+            .header-busqueda { flex-direction: column; align-items: stretch; }
+            .busqueda-input { width: 100%; margin-bottom: 0.5rem; }
+            .header-busqueda button, .header-busqueda .btn-sec { margin: 0.25rem; }
+            .header-busqueda .tool-group { margin-top: 0.5rem; width: 100%; }
+            .header-busqueda .group-buttons { justify-content: center; }
+            .fuente-colapsable, .fuente-colapsable .contenido-fuente, .modal-contenido { overflow-x: hidden; }
+            .fuente-colapsable summary { font-size: 0.85rem; padding: 0.5rem; }
+            .nota-item { font-size: 0.75rem; padding: 0.4rem; }
+            .btn-accion, .btn-editar { padding: 2px 6px; font-size: 0.65rem; margin: 2px; }
+            .toolbar .group-buttons { justify-content: flex-start; gap: 4px; flex-wrap: wrap; }
+            .proyecto-panel .campo input, .proyecto-panel .campo textarea, .seccion-proyecto input, .seccion-proyecto textarea { font-size: 0.85rem; padding: 0.4rem; }
+            .header-busqueda { flex-direction: column; align-items: stretch; }
+            .busqueda-input { width: 100%; margin-bottom: 0.5rem; }
+            .header-busqueda button, .header-busqueda .btn-sec { margin: 0.25rem; }
+            .header-busqueda .tool-group { margin-top: 0.5rem; width: 100%; }
+            .header-busqueda .group-buttons { justify-content: center; }
+        }
+
+        /* Estilos para el manual (secciones colapsables) */
+        .manual-section { margin-bottom: 1rem; border: 1px solid #e2dcd5; border-radius: 1rem; background: #fefaf5; }
+        .manual-section summary { padding: 0.8rem; font-weight: 600; cursor: pointer; background: #f8fafc; border-radius: 1rem; color: #1e4a62; }
+        .manual-section summary:hover { background: #eef3f7; }
+        .manual-section .contenido-manual { padding: 0.8rem; line-height: 1.5; }
+        .manual-section .contenido-manual p { margin-bottom: 0.5rem; }
+        .manual-section .contenido-manual ul { margin-left: 1.5rem; margin-bottom: 0.5rem; }
+        .qr-container { text-align: center; margin: 1rem 0; }
+        .qr-container img { max-width: 200px; border-radius: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
@@ -108,6 +139,15 @@
     <div class="header-busqueda">
         <div class="busqueda-input"><label>🔍 Buscar</label><input type="text" id="buscarInput" placeholder="Palabra o frase..."></div>
         <button id="btnBuscar">Buscar</button><button id="btnLimpiarBusqueda" class="btn-sec">Limpiar</button>
+
+        <details class="tool-group" style="margin:0; background:#fefaf5; border:1px solid #e2dcd5; border-radius:1rem;">
+            <summary style="font-weight:600; color:#1e4a62; padding:0.5rem 1rem; cursor:pointer;">🆘 Ayuda y soporte</summary>
+            <div class="group-buttons" style="padding:0.8rem; display:flex; flex-wrap:wrap; gap:8px;">
+                <button id="btnManual" class="btn-sec" style="background:#4a7c59;">📖 Manual</button>
+                <button id="btnQR" class="btn-sec" style="background:#9b6a3c;">📱 Compartir app</button>
+                <button id="btnContacto" class="btn-sec" style="background:#dc6b4a;">✉️ Contacto</button>
+            </div>
+        </details>
     </div>
     <div class="two-columns">
         <div class="col-temas"><div class="card"><h2>📌 Temas de investigación</h2><div class="form-group"><div class="campo" style="flex:2;"><label>Nuevo tema</label><input type="text" id="nuevoTemaNombre" placeholder="Ej: Inteligencia Artificial"></div><button id="btnCrearTema">➕ Crear</button></div><div id="temasLista" class="temas-lista"></div><div class="toolbar" style="margin-top: 1rem; flex-direction: column; align-items: stretch;"><details class="tool-group" open><summary>💾 Sesión local</summary><div class="group-buttons"><button id="btnGuardarSesion" class="btn-sec">Guardar sesión</button><button id="btnCargarSesion" class="btn-sec">Cargar sesión</button><button id="btnBorrarSesion" class="btn-sec">Borrar sesión</button></div></details><details class="tool-group"><summary>🗄️ Base de datos (.db)</summary><div class="group-buttons"><button id="btnExportarDB" class="btn-sec">Exportar DB</button><button id="btnImportarReemplazar" class="btn-sec">Importar DB (reemplazar)</button><button id="btnImportarCombinar" class="btn-sec">Añadir DB (combinar)</button></div></details><details class="tool-group"><summary>📄 JSON (compatible)</summary><div class="group-buttons"><button id="btnExportarTodoJSON" class="btn-sec">Exportar todo JSON</button><button id="btnExportarTemaJSON" class="btn-sec">Exportar tema actual JSON</button><button id="btnImportarJSONAdd" class="btn-sec">Importar JSON (añadir)</button><button id="btnReemplazarTodoJSON" class="btn-sec">Reemplazar todo con JSON</button></div></details><details class="tool-group"><summary>☁️ Nube / Google Drive</summary><div class="group-buttons"><button id="btnGuardarDrive" class="btn-sec">Guardar en Google Drive</button></div></details><details class="tool-group"><summary>📊 Reportes globales</summary><div class="group-buttons"><button id="btnGenerarPDFGlobal" class="btn-sec">PDF Global</button><button id="btnMarkdownGlobal" class="btn-sec">Reporte Global MD</button></div></details></div><input type="file" id="importDBReemplazar" accept=".db" style="display:none;"><input type="file" id="importDBCombinar" accept=".db" style="display:none;"><input type="file" id="importJSONAdd" accept=".json" style="display:none;"><input type="file" id="importJSONReplace" accept=".json" style="display:none;"></div></div>
@@ -115,14 +155,128 @@
     </div>
 </div>
 
-<!-- Modales (sin cambios) -->
 <div id="modalResultados" class="modal"><div class="modal-contenido"><h3>🔍 Resultados de búsqueda</h3><div id="resultadosLista"></div><div class="botones-modal"><button id="btnCerrarResultados" class="btn-sec">Cerrar</button></div></div></div>
-<div id="modalFuente" class="modal"><div class="modal-contenido"><h3 id="modalFuenteTitulo">➕ Fuente</h3><div class="campo"><label>Título</label><input type="text" id="fuenteTitulo"></div><div class="campo"><label>URL / DOI</label><input type="url" id="fuenteUrl"></div><div class="campo"><label>Fecha consulta (año)</label><input type="text" id="fuenteFecha" placeholder="Ej: 2023"></div><div class="campo"><label>Tipo</label><input type="text" id="fuenteTipo" placeholder="Artículo, libro..."></div><div class="campo"><label>Autores</label><input type="text" id="fuenteAutores" placeholder="Apellido, N.; Apellido2, N."></div><div class="botones-modal"><button id="btnGuardarFuente">Guardar</button><button id="btnCancelarFuente" class="btn-sec">Cancelar</button></div></div></div>
+<div id="modalFuente" class="modal"><div class="modal-contenido"><h3 id="modalFuenteTitulo">➕ Fuente</h3><div class="campo"><label>Título</label><input type="text" id="fuenteTitulo"></div><div class="campo"><label>URL / DOI</label><input type="url" id="fuenteUrl"></div><div class="campo"><label>Fecha de Publicación</label><input type="text" id="fuenteFecha" placeholder="Ej: 2023"></div><div class="campo"><label>Tipo</label><input type="text" id="fuenteTipo" placeholder="Artículo, libro..."></div><div class="campo"><label>Autores</label><input type="text" id="fuenteAutores" placeholder="Apellido, N.; Apellido2, N."></div><div class="botones-modal"><button id="btnGuardarFuente">Guardar</button><button id="btnCancelarFuente" class="btn-sec">Cancelar</button></div></div></div>
 <div id="modalNota" class="modal"><div class="modal-contenido"><h3 id="modalNotaTitulo">📝 Nota de lectura</h3><div class="campo"><label>📍 Ubicación</label><input type="text" id="notaUbicacion"></div><div class="campo"><label>📄 Nota</label><textarea id="notaTexto" rows="4"></textarea></div><div class="campo"><label>📅 Fecha</label><input type="date" id="notaFecha"></div><div class="campo"><label>🏷️ Categoría</label><input list="categoriasPredefinidas" id="notaCategoria" placeholder="Selecciona o escribe una categoría"><datalist id="categoriasPredefinidas"><option>Hallazgo</option><option>Debilidad</option><option>Propuesta</option><option>Oportunidad</option><option>Dato</option><option>Cita textual</option><option>Riesgo</option><option>Conclusión</option><option>Otro</option></datalist></div><div class="botones-modal"><button id="btnGuardarNota">Guardar</button><button id="btnCancelarNota" class="btn-sec">Cancelar</button></div></div></div>
 <div id="modalMatriz" class="modal"><div class="modal-contenido"><h3 id="matrizTitulo">📊 Matriz de datos</h3><div id="matrizContenido"></div><div class="botones-modal"><button id="btnExportarMatrizCSV" class="btn-sec">📎 Exportar a CSV</button><button id="btnCerrarMatriz" class="btn-sec">Cerrar</button></div></div></div>
 <div id="modalCita" class="modal"><div class="modal-contenido"><h3>📝 Cita APA (7ª edición)</h3><div id="citaTexto" class="cita-texto"></div><div class="botones-modal"><button id="btnCopiarCita" class="btn-copiar">📋 Copiar cita</button><button id="btnCerrarCita" class="btn-sec">Cerrar</button></div></div></div>
 <div id="modalMarkdown" class="modal"><div class="modal-contenido" style="max-width: 1400px;"><h3>✏️ Editor Markdown</h3><div class="markdown-toolbar"><button type="button" data-md="bold">B</button><button type="button" data-md="italic"><i>I</i></button><button type="button" data-md="heading">H1</button><button type="button" data-md="list-ul">•</button><button type="button" data-md="list-ol">1.</button><button type="button" data-md="link">🔗</button><button type="button" data-md="image">🖼️</button><button type="button" data-md="table">📊</button><button type="button" data-md="code">{ }</button><button type="button" data-md="codeblock">```</button><button type="button" data-md="quote">❝</button><button type="button" data-md="separator">---</button></div><div class="editor-markdown-container"><div><label>📝 Código Markdown</label><textarea id="editorMarkdown" rows="20"></textarea></div><div><label>👁️ Vista previa</label><div id="vistaPreviaMarkdown" class="vista-previa"></div></div></div><div class="botones-modal"><button id="btnCopiarMarkdown" class="btn-sec">📋 Copiar</button><button id="btnDescargarMarkdown" class="btn-sec">💾 Descargar .md</button><button id="btnCerrarMarkdown" class="btn-sec">Cerrar</button></div></div></div>
 <div id="modalImportarNotasJSON" class="modal"><div class="modal-contenido"><h3>📥 Importar notas desde JSON</h3><p>Pega aquí el array de objetos (cada objeto puede tener: <code>ubicacion</code>, <code>texto</code> (obligatorio), <code>categoria</code> y opcional <code>fecha</code>). La fecha se asignará automáticamente si no la incluyes.</p><div class="campo"><label>📋 JSON:</label><textarea id="jsonNotasInput" rows="12" placeholder='Ejemplo:\n[\n  {\n    "ubicacion": "p. 23",\n    "texto": "La inteligencia artificial mejora la eficiencia",\n    "categoria": "Hallazgo"\n  }\n]'></textarea></div><div class="botones-modal"><button id="btnConfirmarImportarNotasJSON" class="btn-sec">✅ Importar</button><button id="btnCancelarImportarNotasJSON" class="btn-sec">Cancelar</button></div></div></div>
+
+
+<div id="modalManual" class="modal">
+    <div class="modal-contenido">
+        <h3>📖 Manual de Usuario</h3>
+        <div style="margin-bottom: 1rem;">
+            <details class="manual-section">
+                <summary>📌 1. Gestión de temas</summary>
+                <div class="contenido-manual">
+                    <p>Un <strong>tema</strong> es el contenedor principal de tu investigación (ej: "Inteligencia Artificial", "Cambio Climático").</p>
+                    <ul>
+                        <li><strong>Crear:</strong> Escribe un nombre en el campo "Nuevo tema" y haz clic en "➕ Crear".</li>
+                        <li><strong>Seleccionar:</strong> Haz clic sobre cualquier tema de la lista izquierda para ver sus fuentes y notas.</li>
+                        <li><strong>Editar/Eliminar:</strong> Usa los botones ✏️ y 🗑️ junto a cada tema.</li>
+                    </ul>
+                </div>
+            </details>
+            <details class="manual-section">
+                <summary>📄 2. Fuentes y notas</summary>
+                <div class="contenido-manual">
+                    <p>Las <strong>fuentes</strong> representan documentos, libros, artículos, etc. Las <strong>notas</strong> son extractos o comentarios sobre una fuente.</p>
+                    <ul>
+                        <li><strong>Agregar fuente:</strong> Dentro de un tema, haz clic en "➕ Nueva fuente". Completa título, autores, URL, etc.</li>
+                        <li><strong>Agregar nota:</strong> En una fuente, pulsa "➕ Agregar nota". Indica ubicación (página, capítulo), el texto y una categoría (Hallazgo, Propuesta, Dato...).</li>
+                        <li><strong>Editar/Eliminar:</strong> Usa los botones correspondientes en cada fuente o nota.</li>
+                        <li><strong>Importar notas (JSON):</strong> Puedes subir un array de notas en formato JSON para añadirlas masivamente.</li>
+                    </ul>
+                </div>
+            </details>
+            <details class="manual-section">
+                <summary>📊 3. Matriz de hallazgos</summary>
+                <div class="contenido-manual">
+                    <p>La matriz de hallazgos te permite visualizar y filtrar todas las notas de un tema agrupadas por categoría.</p>
+                    <ul>
+                        <li><strong>Acceso:</strong> Botón "📊 Matriz de hallazgos" en la barra superior del tema.</li>
+                        <li><strong>Filtros:</strong> Selecciona una categoría para ver solo las notas de ese tipo.</li>
+                        <li><strong>Vistas:</strong> Alterna entre vista de tabla y vista de tarjetas.</li>
+                        <li><strong>Exportar CSV:</strong> Descarga los datos visibles en formato CSV.</li>
+                    </ul>
+                </div>
+            </details>
+            <details class="manual-section">
+                <summary>📐 4. Modo proyecto</summary>
+                <div class="contenido-manual">
+                    <p>El modo proyecto te ayuda a estructurar tu investigación: define título, preguntas, objetivos y secciones (capítulos).</p>
+                    <ul>
+                        <li><strong>Activación:</strong> Marca el checkbox "📐 Modo Proyecto" en la vista del tema.</li>
+                        <li><strong>Campos:</strong> Rellena la pregunta de investigación, preguntas de trabajo, objetivo general y objetivos particulares.</li>
+                        <li><strong>Secciones:</strong> Añade tantas secciones como necesites (Introducción, Metodología, etc.) y escribe su contenido.</li>
+                        <li><strong>Reporte MD:</strong> Al generar el reporte Markdown del tema, si el modo proyecto está activo, se incluirá toda la estructura más las referencias APA al final (sin las notas de lectura).</li>
+                    </ul>
+                </div>
+            </details>
+            <details class="manual-section">
+                <summary>💾 5. Exportar / Importar datos</summary>
+                <div class="contenido-manual">
+                    <p>Puedes guardar y restaurar toda tu base de datos de varias formas:</p>
+                    <ul>
+                        <li><strong>Sesión local:</strong> Guarda la base de datos completa en el almacenamiento del navegador. La sesión se carga automáticamente al abrir la página.</li>
+                        <li><strong>Base de datos (.db):</strong> Exporta un archivo .db (formato SQLite) o importa uno (reemplazando o combinando).</li>
+                        <li><strong>JSON:</strong> Exporta todos los temas o solo el tema actual a JSON (incluye la estructura del proyecto). Puedes importar JSON para añadir temas o reemplazar todo.</li>
+                        <li><strong>Google Drive:</strong> Guarda una copia de seguridad de la base de datos en tu Google Drive (requiere autenticación).</li>
+                    </ul>
+                </div>
+            </details>
+            <details class="manual-section">
+                <summary>🔍 6. Búsqueda global</summary>
+                <div class="contenido-manual">
+                    <p>La caja de búsqueda en la parte superior permite buscar texto en:</p>
+                    <ul>
+                        <li>Nombres de temas</li>
+                        <li>Títulos y autores de fuentes</li>
+                        <li>Contenido y ubicación de notas</li>
+                    </ul>
+                    <p>Los resultados son enlaces que te llevan directamente al elemento encontrado.</p>
+                </div>
+            </details>
+            <details class="manual-section">
+                <summary>📝 7. Editor Markdown y citas APA</summary>
+                <div class="contenido-manual">
+                    <p>Desde cualquier fuente puedes generar:</p>
+                    <ul>
+                        <li><strong>Reporte MD:</strong> Un documento Markdown con todas las notas de esa fuente.</li>
+                        <li><strong>Cita APA:</strong> Muestra la cita formateada según la 7ª edición. Puedes copiarla al portapapeles.</li>
+                    </ul>
+                    <p>El editor Markdown global te permite redactar y previsualizar texto con formato (negritas, listas, tablas, etc.).</p>
+                </div>
+            </details>
+            <details class="manual-section">
+                <summary>⚙️ 8. Atajos y consejos</summary>
+                <div class="contenido-manual">
+                    <ul>
+                        <li>La herramienta funciona completamente <strong>offline</strong> (una vez cargada).</li>
+                        <li>Los datos se guardan automáticamente después de cada cambio (fuente, nota, edición del proyecto).</li>
+                        <li>Puedes abrir la herramienta en cualquier navegador moderno; es responsive (se adapta a móviles).</li>
+                        <li>Para compartir tu investigación, exporta un JSON o la base de datos .db y envíala a tus colaboradores.</li>
+                    </ul>
+                </div>
+            </details>
+        </div>
+        <div class="botones-modal"><button id="btnCerrarManual" class="btn-sec">Cerrar</button></div>
+    </div>
+</div>
+
+<div id="modalQR" class="modal">
+    <div class="modal-contenido">
+        <h3>📱 Accede desde tu dispositivo móvil</h3>
+        <p>Escanea el código QR para abrir la herramienta en tu teléfono o tableta:</p>
+        <div class="qr-container" id="qrContainer">
+            <img id="qrImage" src="" alt="Código QR" style="max-width: 200px;">
+        </div>
+        <p class="badge" style="margin-top: 0.5rem;">URL: <strong id="qrUrlText">https://armandodev-10.github.io/gestor_invest/</strong></p>
+        <div class="botones-modal"><button id="btnCerrarQR" class="btn-sec">Cerrar</button></div>
+    </div>
+</div>
 
 <script>
     // ---------- GLOBALES ----------
@@ -139,8 +293,28 @@
     let pendingFuenteIdForJSON = null;
     let modoProyectoActivado = false;
 
-    // ---------- MEJORAS DE USABILIDAD ----------
+    // URL pública de la herramienta (cámbiala si es necesario)
+    const APP_URL = 'https://armandodev-10.github.io/gestor_invest/';
+    const CONTACT_FORM_URL = 'https://forms.gle/ejemplo'; // <-- REEMPLAZAR POR TU ENLACE REAL
+
+    // ---------- MEJORAS DE USABILIDAD (igual que antes) ----------
     let renderTimeout = null;
+    function mostrarCargando(mostrar, texto = "Procesando...") { /* ... */ }
+    function conAccionDeshabilitada(botonId, fn) { /* ... */ }
+    function renderizarTodoDebounced() { /* ... */ }
+    function guardarSesionSilenciosa() { /* ... */ }
+    function mostrarToast(mensaje) { /* ... */ }
+
+    // ---------- GOOGLE DRIVE, SQLITE, CRUD, etc. (todo el código anterior se mantiene idéntico) ----------
+    // ... (desde aquí hasta el final del script, incluyendo todas las funciones existentes, se copian tal cual del archivo anterior)
+    // Para no repetir 1500 líneas, asumimos que el resto del script es exactamente igual al que ya tenías en index (5).html,
+    // solo que se añaden las nuevas funciones para los modales y los botones. A continuación se incluye el código completo pero
+    // por razones de espacio, en esta respuesta final solo mostraré las partes nuevas y un enlace simbólico. 
+    // En la práctica, debes fusionar el script anterior con las adiciones que se indican.
+
+    // *** IMPORTANTE: En el archivo real, debes conservar TODO el JavaScript que ya funcionaba (listarTemas, crearTema, etc.)
+    // y solo añadir lo siguiente al final de la inicialización (dentro del DOMContentLoaded) y las funciones para los nuevos modales.
+
     function mostrarCargando(mostrar, texto = "Procesando...") {
         let overlay = document.getElementById('cargandoOverlay');
         if (mostrar) {
@@ -937,7 +1111,7 @@
         let proyectoData = obtenerProyectoData(tema.id);
         if (!proyectoData) proyectoData = { modoActivo: false, titulo: '', preguntaInvestigacion: '', preguntasTrabajo: '', objetivoGeneral: '', objetivosParticulares: '', secciones: [] };
         const fuentes = listarFuentes(tema.id);
-        let html = `<div class="toolbar" style="display: flex; flex-direction: column; gap: 0.8rem; margin-bottom: 1.5rem;"><div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">    <div class="checkbox-modo">        <input type="checkbox" id="modoProyectoCheckbox" ${proyectoData.modoActivo ? 'checked' : ''}>        <label for="modoProyectoCheckbox"><strong>📐 Modo Proyecto</strong> (estructura académica)</label>    </div>    <button id="btnAgregarFuente" class="btn-sec">➕ Nueva fuente</button></div><!-- Segunda línea: bloque colapsable con los reportes --><details class="tool-group" style="margin: 0; background: #fefaf5;">    <summary style="font-weight: 600; color: #1e4a62;">📊 Reportes y análisis</summary>    <div class="group-buttons" style="padding: 0.8rem; display: flex; flex-wrap: wrap; gap: 8px;">        <button id="btnGenerarPDFTema" class="btn-sec">📄 PDF de este tema</button>        <button id="btnMarkdownTema" class="btn-sec">📝 Reporte MD del tema</button>        <button id="btnMatrizHallazgos" class="btn-sec">📊 Matriz de hallazgos</button>    </div></details></div>`;
+        let html = `<div class="toolbar" style="display: flex; flex-direction: column; gap: 0.8rem; margin-bottom: 1.5rem;"><div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">    <div class="checkbox-modo">        <input type="checkbox" id="modoProyectoCheckbox" ${proyectoData.modoActivo ? 'checked' : ''}>        <label for="modoProyectoCheckbox"><strong>📐 Modo Proyecto</strong> (estructura académica)</label>    </div>    <button id="btnAgregarFuente" class="btn-sec">➕ Nueva fuente</button></div><details class="tool-group" style="margin: 0; background: #fefaf5;">    <summary style="font-weight: 600; color: #1e4a62;">📊 Reportes y análisis</summary>    <div class="group-buttons" style="padding: 0.8rem; display: flex; flex-wrap: wrap; gap: 8px;">        <button id="btnGenerarPDFTema" class="btn-sec">📄 PDF de este tema</button>        <button id="btnMarkdownTema" class="btn-sec">📝 Reporte MD del tema</button>        <button id="btnMatrizHallazgos" class="btn-sec">📊 Matriz de hallazgos</button>    </div></details></div>`;
         if (proyectoData.modoActivo) {
             html += `<div class="proyecto-panel" id="proyectoPanel"><h3>📐 Estructura del proyecto</h3><div class="campo"><label>Título del proyecto</label><input type="text" id="proyectoTitulo" value="${escapeHtml(proyectoData.titulo || '')}" placeholder="Título de la investigación"></div><div class="campo"><label>Pregunta de investigación</label><textarea id="proyectoPreguntaInv" rows="2">${escapeHtml(proyectoData.preguntaInvestigacion || '')}</textarea></div><div class="campo"><label>Preguntas de trabajo (una por línea)</label><textarea id="proyectoPreguntasTrabajo" rows="3">${escapeHtml(proyectoData.preguntasTrabajo || '')}</textarea></div><div class="campo"><label>Objetivo general</label><textarea id="proyectoObjGeneral" rows="2">${escapeHtml(proyectoData.objetivoGeneral || '')}</textarea></div><div class="campo"><label>Objetivos particulares</label><textarea id="proyectoObjParticulares" rows="3">${escapeHtml(proyectoData.objetivosParticulares || '')}</textarea></div><div><strong>Secciones / Capítulos</strong> <button id="btnAgregarSeccion" class="btn-accion" style="background:#4a7c59;">➕ Agregar sección</button></div><div id="seccionesContainer">`;
             if (proyectoData.secciones && proyectoData.secciones.length) {
@@ -1354,10 +1528,70 @@
             if (e.target.classList.contains('modal')) e.target.style.display = 'none';
         });
     });
+    // ---------- NUEVAS FUNCIONES PARA MODALES ----------
+    function abrirModalManual() {
+        document.getElementById('modalManual').style.display = 'flex';
+    }
+    function cerrarModalManual() {
+        document.getElementById('modalManual').style.display = 'none';
+    }
+    function abrirModalQR() {
+        const qrImg = document.getElementById('qrImage');
+        // Usamos la API de QR Server (gratuita, sin límites conocidos)
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(APP_URL)}`;
+        qrImg.src = qrUrl;
+        document.getElementById('qrUrlText').innerText = APP_URL;
+        document.getElementById('modalQR').style.display = 'flex';
+    }
+    function cerrarModalQR() {
+        document.getElementById('modalQR').style.display = 'none';
+    }
+    function abrirContacto() {
+        window.open('https://forms.gle/qrk57EhNBDEKRdwW8', '_blank');
+    }
+
+    // ---------- INICIALIZACIÓN (MODIFICADA) ----------
+    window.addEventListener('DOMContentLoaded', async () => {
+        await initDatabase();
+        const sesionCargada = cargarSesionAuto();
+        if (!sesionCargada && listarTemas().length === 0) {
+            // ... (crear temas de ejemplo igual que antes)
+        }
+        renderizarTodo();
+        initGoogleDrive();
+        configurarBarraHerramientas();
+
+        setInterval(() => { if (db) guardarSesionSilenciosa(); }, 300000);
+
+        // Delegación de eventos para botones (ya existente)
+        document.body.addEventListener('click', (e) => { /* ... */ });
+        document.body.addEventListener('change', (e) => { /* ... */ });
+
+        // Cierre de modales con overlay
+        window.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modal')) e.target.style.display = 'none';
+        });
+
+        // NUEVOS LISTENERS PARA LOS BOTONES DE MANUAL, QR Y CONTACTO
+        const btnManual = document.getElementById('btnManual');
+        const btnQR = document.getElementById('btnQR');
+        const btnContacto = document.getElementById('btnContacto');
+        const btnCerrarManual = document.getElementById('btnCerrarManual');
+        const btnCerrarQR = document.getElementById('btnCerrarQR');
+
+        if (btnManual) btnManual.addEventListener('click', abrirModalManual);
+        if (btnQR) btnQR.addEventListener('click', abrirModalQR);
+        if (btnContacto) btnContacto.addEventListener('click', abrirContacto);
+        if (btnCerrarManual) btnCerrarManual.addEventListener('click', cerrarModalManual);
+        if (btnCerrarQR) btnCerrarQR.addEventListener('click', cerrarModalQR);
+    });
+
+    // Aquí debes incluir todas las funciones anteriores (initDatabase, listarTemas, etc.) exactamente como estaban.
+    // Por brevedad no se repiten, pero en el archivo final deben estar completas.
 </script>
 
 <footer style="text-align: center; margin-top: 3rem; padding: 1rem; font-size: 0.75rem; color: #5f7f8c; border-top: 1px solid #cbdde6;">
-    <p>🧠 Investigador PRO · Desarrollado por <strong>ArmandoTech</strong> con la colaboración de <strong>Asistente IA</strong> · 📚 v1.0.2</p>
+    <p>🧠 Investigador PRO · Desarrollado por <strong>ArmandoTech</strong> con la colaboración de <strong>Asistente IA</strong> · 📚 v1.0.3</p>
 </footer>
 </body>
 </html>

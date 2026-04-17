@@ -180,7 +180,7 @@
         }, 100);
     }
 
-    // ---------- GUARDADO AUTOMÁTICO SILENCIOSO (NUEVO) ----------
+    // ---------- GUARDADO AUTOMÁTICO SILENCIOSO ----------
     function guardarSesionSilenciosa() {
         try {
             const dbData = db.export();
@@ -416,9 +416,9 @@
         function renderTabla(notas) {
             let html = `<table class="matriz-tabla" id="matrizHallazgosTabla"><thead><tr><th>Fuente</th><th>Autores/Año</th><th>Ubicación</th><th>Hallazgo / Nota</th><th>Categoría</th><th>Acción</th></tr></thead><tbody>`;
             for (let n of notas) {
-                html += `<tr data-nota-id="${n.id}"><td>${escapeHtml(n.fuente)}</td><td>${escapeHtml(n.autores)} ${n.anio ? `(${n.anio})` : ''}</td><td>${escapeHtml(n.ubicacion)}</td><td>${escapeHtml(n.texto)}</td><td><input type="text" class="categoria-input" data-id="${n.id}" value="${escapeHtml(n.categoria)}" list="categoriasList" style="width:100%;"><datalist id="categoriasList">${Array.from(new Set(todasNotas.map(nn => nn.categoria))).filter(c=>c).map(c=>`<option>${c}</option>`).join('')}</datalist></td><td><button class="guardar-categoria" data-id="${n.id}">💾 Guardar</button></tr>`;
+                html += `<tr data-nota-id="${n.id}"><td>${escapeHtml(n.fuente)}</td><td>${escapeHtml(n.autores)} ${n.anio ? `(${n.anio})` : ''}</td><td>${escapeHtml(n.ubicacion)}</td><td>${escapeHtml(n.texto)}</td><td><input type="text" class="categoria-input" data-id="${n.id}" value="${escapeHtml(n.categoria)}" list="categoriasList" style="width:100%;"><datalist id="categoriasList">${Array.from(new Set(todasNotas.map(nn => nn.categoria))).filter(c=>c).map(c=>`<option>${c}</option>`).join('')}</datalist></td><td><button class="guardar-categoria" data-id="${n.id}">💾 Guardar</button></td></tr>`;
             }
-            if (notas.length === 0) html += '<tr><td colspan="6">No hay notas con este filtro.</tr>';
+            if (notas.length === 0) html += '<tr><td colspan="6">No hay notas con este filtro.</td></tr>';
             html += `</tbody></table>`;
             contenedor.innerHTML = html;
             document.querySelectorAll('.guardar-categoria').forEach(btn => {
@@ -490,7 +490,7 @@
         if (!notas.length) html += '<p>No hay notas registradas.</p>';
         else {
             html += `<table class="matriz-tabla"><thead><tr><th>#</th><th>Ubicación</th><th>Categoría</th><th>Nota</th><th>Fecha</th></tr></thead><tbody>`;
-            notas.forEach((n, i) => { html += `<tr><td>${i+1}</td><td>${escapeHtml(n.ubicacion)}</td><td>${escapeHtml(n.categoria || '—')}</td><td>${escapeHtml(n.texto)}</td><td>${n.fecha || '—'}</tr>`; });
+            notas.forEach((n, i) => { html += `<tr><td>${i+1}</td><td>${escapeHtml(n.ubicacion)}</td><td>${escapeHtml(n.categoria || '—')}</td><td>${escapeHtml(n.texto)}</td><td>${n.fecha || '—'}</td></tr>`; });
             html += `</tbody></table>`;
         }
         document.getElementById('matrizContenido').innerHTML = html;
@@ -717,38 +717,76 @@
         const data = JSON.stringify(temaObj, null, 2);
         const blob = new Blob([data], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `tema_${tema.nombre.replace(/\s/g, '_')}.json`; a.click(); URL.revokeObjectURL(a.href);
     }
+
+    // Versión mejorada de importarJSONAdd con logs y manejo de errores
     function importarJSONAdd(file) {
+        console.log("Iniciando importación JSON (añadir) con archivo:", file);
+        if (!file) {
+            alert("No se proporcionó un archivo.");
+            return;
+        }
         const reader = new FileReader();
-        reader.onload = e => {
+        reader.onload = function(e) {
+            console.log("Archivo leído correctamente, longitud:", e.target.result.length);
             try {
                 const data = JSON.parse(e.target.result);
+                console.log("JSON parseado:", data);
                 const items = Array.isArray(data) ? data : [data];
+                let temasProcesados = 0;
                 for (let item of items) {
-                    if (!item.nombre) continue;
+                    if (!item.nombre) {
+                        console.warn("Elemento sin nombre, se omite:", item);
+                        continue;
+                    }
                     const existe = listarTemas().some(t => t.nombre.toLowerCase() === item.nombre.toLowerCase());
                     let temaId;
                     if (existe) {
                         if (!confirm(`El tema "${item.nombre}" ya existe. ¿Deseas añadir sus fuentes al tema existente?`)) continue;
                         const temaExistente = listarTemas().find(t => t.nombre.toLowerCase() === item.nombre.toLowerCase());
                         temaId = temaExistente.id;
-                        if (item.proyecto_data && !temaExistente.proyecto_data) guardarProyectoData(temaId, item.proyecto_data);
+                        if (item.proyecto_data && !temaExistente.proyecto_data) {
+                            guardarProyectoData(temaId, item.proyecto_data);
+                        }
                     } else {
                         temaId = crearTema(item.nombre);
                         if (item.proyecto_data) guardarProyectoData(temaId, item.proyecto_data);
                     }
                     if (!temaId) continue;
                     for (let f of (item.fuentes || [])) {
-                        const fuenteData = { titulo: f.titulo || 'Sin título', url: f.url || '', fechaConsulta: f.fechaConsulta || '', tipo: f.tipo || '', autores: f.autores || '' };
+                        const fuenteData = {
+                            titulo: f.titulo || 'Sin título',
+                            url: f.url || '',
+                            fechaConsulta: f.fechaConsulta || '',
+                            tipo: f.tipo || '',
+                            autores: f.autores || ''
+                        };
                         const fuenteId = guardarFuente(temaId, null, fuenteData);
-                        for (let n of (f.notas || [])) { guardarNota(fuenteId, null, { ubicacion: n.ubicacion || '', texto: n.texto || '', fecha: n.fecha || '', categoria: n.categoria || '' }); }
+                        for (let n of (f.notas || [])) {
+                            guardarNota(fuenteId, null, {
+                                ubicacion: n.ubicacion || '',
+                                texto: n.texto || '',
+                                fecha: n.fecha || '',
+                                categoria: n.categoria || ''
+                            });
+                        }
                     }
+                    temasProcesados++;
                 }
                 renderizarTodo();
-                alert('JSON importado correctamente.');
-            } catch(err) { alert('Error al parsear JSON: ' + err.message); }
+                alert(`JSON importado correctamente. Se procesaron ${temasProcesados} temas.`);
+                guardarSesionSilenciosa();
+            } catch(err) {
+                console.error("Error al parsear JSON:", err);
+                alert('Error al parsear JSON: ' + err.message + '\nRevisa la consola para más detalles.');
+            }
+        };
+        reader.onerror = function(err) {
+            console.error("Error al leer el archivo:", err);
+            alert("Error al leer el archivo. Asegúrate de que sea un JSON válido.");
         };
         reader.readAsText(file);
     }
+
     function reemplazarTodoConJSON(file) {
         if (!confirm('⚠️ Esto reemplazará TODOS los datos actuales por los del JSON. ¿Continuar?')) return;
         const reader = new FileReader();
@@ -768,6 +806,7 @@
                     }
                 }
                 temaActivoId = null; renderizarTodo(); alert('Datos reemplazados con JSON.');
+                guardarSesionSilenciosa();
             } catch(err) { alert('Error: ' + err.message); }
         };
         reader.readAsText(file);
@@ -1142,7 +1181,7 @@
             if (db) guardarSesionSilenciosa();
         }, 300000); // cada 5 minutos
 
-        // ---------- DELEGACIÓN DE EVENTOS (UN SOLO LISTENER PARA TODOS LOS BOTONES) ----------
+        // ---------- DELEGACIÓN DE EVENTOS PARA BOTONES ----------
         document.body.addEventListener('click', (e) => {
             const btn = e.target.closest('button');
             if (!btn) return;
@@ -1277,6 +1316,36 @@
                         guardarSesionSilenciosa();
                     }
                 }
+            }
+        });
+
+        // ---------- DELEGACIÓN DE EVENTOS PARA INPUTS FILE (MÁS ROBUSTO) ----------
+        document.body.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target.id === 'importJSONAdd') {
+                if (target.files.length) {
+                    importarJSONAdd(target.files[0]);
+                }
+                target.value = ''; // Limpiar para permitir re-seleccionar el mismo archivo
+                e.preventDefault();
+            } else if (target.id === 'importJSONReplace') {
+                if (target.files.length) {
+                    reemplazarTodoConJSON(target.files[0]);
+                }
+                target.value = '';
+                e.preventDefault();
+            } else if (target.id === 'importDBReemplazar') {
+                if (target.files.length) {
+                    importarDBReemplazar(target.files[0]);
+                }
+                target.value = '';
+                e.preventDefault();
+            } else if (target.id === 'importDBCombinar') {
+                if (target.files.length) {
+                    importarDBCombinar(target.files[0]);
+                }
+                target.value = '';
+                e.preventDefault();
             }
         });
 
